@@ -71,17 +71,47 @@ adjSE3(const float *t, const float *q, const float *X, float *Y) {
   Y[5] += v[2];
 }
 
+// Omega(qj) = 
+//  qj[3]  -qj[2]   qj[1]   qj[0]
+//  qj[2]   qj[3]  -qj[0]   qj[1]
+// -qj[1]   qj[0]   qj[3]   qj[2]
+// -qj[0]  -qj[1]  -qj[2]   qj[3]
+
+// qi_inv = (-qi[0],-qi[1],-qi[2],qi[3])
+
+// qi is g to i
+// ti is g in i
+// qij is i to j 
+// tij is i in j
+
 __device__ void 
 relSE3(const float *ti, const float *qi, const float *tj, const float *qj, float *tij, float *qij) {
-  qij[0] = -qj[3] * qi[0] + qj[0] * qi[3] - qj[1] * qi[2] + qj[2] * qi[1],
-  qij[1] = -qj[3] * qi[1] + qj[1] * qi[3] - qj[2] * qi[0] + qj[0] * qi[2],
-  qij[2] = -qj[3] * qi[2] + qj[2] * qi[3] - qj[0] * qi[1] + qj[1] * qi[0],
-  qij[3] =  qj[3] * qi[3] + qj[0] * qi[0] + qj[1] * qi[1] + qj[2] * qi[2],
+
+  // Omega(qj) @ qi_inv
+  qij[0] = -qj[3] * qi[0]  +  qj[2] * qi[1]  -  qj[1] * qi[2]  +  qj[0] * qi[3];
+  qij[1] = -qj[2] * qi[0]  -  qj[3] * qi[1]  +  qj[0] * qi[2]  +  qj[1] * qi[3];
+  qij[2] =  qj[1] * qi[0]  -  qj[0] * qi[1]  -  qj[3] * qi[2]  +  qj[2] * qi[3];
+  qij[3] =  qj[0] * qi[0]  +  qj[1] * qi[1]  +  qj[2] * qi[2]  +  qj[3] * qi[3];
 
   actSO3(qij, ti, tij);
   tij[0] = tj[0] - tij[0];
   tij[1] = tj[1] - tij[1];
   tij[2] = tj[2] - tij[2];
+}
+
+__device__ void 
+actSE3Fully(const float *tjk, const float *qjk, const float *tij, const float *qij, float *tik, float *qik) {
+
+  // Omega(qjk) @ qij
+  qik[0] =  qjk[3] * qij[0]  -  qjk[2] * qij[1]  +  qjk[1] * qij[2]  +  qjk[0] * qij[3];
+  qik[1] =  qjk[2] * qij[0]  +  qjk[3] * qij[1]  -  qjk[0] * qij[2]  +  qjk[1] * qij[3];
+  qik[2] = -qjk[1] * qij[0]  +  qjk[0] * qij[1]  +  qjk[3] * qij[2]  +  qjk[2] * qij[3];
+  qik[3] = -qjk[0] * qij[0]  -  qjk[1] * qij[1]  -  qjk[2] * qij[2]  +  qjk[3] * qij[3];
+
+  actSO3(qjk, tij, tik);
+  tik[0] += tjk[0];
+  tik[1] += tjk[1];
+  tik[2] += tjk[2];
 }
 
   

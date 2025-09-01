@@ -18,6 +18,17 @@ from dpvo.plot_utils import plot_trajectory
 from dpvo.stream import image_stream
 from dpvo.utils import Timer
 
+
+def write_trajectory(path, seq, traj, times, trial_id):
+    folder_path = os.path.join(path, str(trial_id).zfill(2))
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
+    traj_path = os.path.join(folder_path, seq + ".txt")
+    with open(traj_path, 'w') as file:
+        for idx in range(len(times)):
+            file.write(f"{times[idx]:.5f}, {traj[idx,0]:.3f}, {traj[idx,1]:.3f}, {traj[idx,2]:.3f}, {traj[idx,3]:.5f}, {traj[idx,4]:.5f}, {traj[idx,5]:.5f}, {traj[idx,6]:.5f}\n")
+
+
 SKIP = 0
 
 def show_image(image, t=0):
@@ -37,6 +48,9 @@ def run(cfg, network, imagedir, calib, stride=1, viz=False, show_img=False):
     while 1:
         (t, image, intrinsics) = queue.get()
         if t < 0: break
+
+        cv2.imshow("image", image)
+        cv2.waitKey(1)
 
         image = torch.from_numpy(image).permute(2,0,1).cuda()
         intrinsics = torch.from_numpy(intrinsics).cuda()
@@ -63,8 +77,8 @@ if __name__ == '__main__':
     parser.add_argument('--stride', type=int, default=2)
     parser.add_argument('--viz', action="store_true")
     parser.add_argument('--show_img', action="store_true")
-    parser.add_argument('--trials', type=int, default=1)
-    parser.add_argument('--eurocdir', default="datasets/EUROC")
+    parser.add_argument('--trials', type=int, default=9)
+    parser.add_argument('--eurocdir', default="/media/haktanito/HDD/EuroC")
     parser.add_argument('--backend_thresh', type=float, default=64.0)
     parser.add_argument('--plot', action="store_true")
     parser.add_argument('--opts', nargs='+', default=[])
@@ -100,11 +114,16 @@ if __name__ == '__main__':
         groundtruth = "datasets/euroc_groundtruth/{}.txt".format(scene) 
 
         scene_results = []
-        for i in range(args.trials):
+        start_idx = 1 
+        for i in range(start_idx,args.trials+start_idx):
             traj_est, timestamps = run(cfg, args.network, imagedir, "calib/euroc.txt", args.stride, args.viz, args.show_img)
 
+            
             images_list = sorted(glob.glob(os.path.join(imagedir, "*.png")))[::args.stride]
             tstamps = [float(x.split('/')[-1][:-4]) for x in images_list]
+
+            # Save the estimated trajectory for further analysis
+            write_trajectory(path='EstimatedTrajectories/OriginalDPVO', seq=scene, traj=traj_est, times=tstamps, trial_id=i)
 
             traj_est = PoseTrajectory3D(
                 positions_xyz=traj_est[:,:3],
