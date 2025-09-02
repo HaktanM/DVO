@@ -73,14 +73,14 @@ class RGBDDataset(data.Dataset):
             dataset + ".h5"
         )
 
-        # Open a new file only if dataset changes
+        # Open new file only if dataset changes
         if path_to_h5 != self.h5_path:
             if self.h5 is not None:
-                self.h5.close()  # close previous file safely
+                self.h5.close()  # close previous file
             self.h5 = h5py.File(path_to_h5, 'r')
             self.h5_path = path_to_h5
-        item = self.h5[level][seq][item][idx]
-        return item
+        item_data = self.h5[level][seq][item][idx]
+        return item_data
     
     def image_read(self, image_file):
         return self.get_item_from_h5(image_file)
