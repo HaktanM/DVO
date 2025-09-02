@@ -15,6 +15,8 @@ import os.path as osp
 from .augmentation import RGBDAugmentor
 from .rgbd_utils import *
 
+import h5py
+
 class RGBDDataset(data.Dataset):
     def __init__(self, name, datapath, n_frames=4, crop_size=[480,640], fmin=10.0, fmax=75.0, aug=True, sample=True):
         """ Base class for RGBD dataset """
@@ -41,7 +43,12 @@ class RGBDDataset(data.Dataset):
             pickle.load(open('datasets/TartanAir.pickle', 'rb'))[0]
 
         self._build_dataset_index()
+
+        # Which h5 file is used the last time
+        self.h5      = None
+        self.h5_path = None 
                 
+
     def _build_dataset_index(self):
         self.dataset_index = []
         for scene in self.scene_info:
@@ -53,13 +60,33 @@ class RGBDDataset(data.Dataset):
             else:
                 print("Reserving {} for validation".format(scene))
 
-    @staticmethod
-    def image_read(image_file):
-        return cv2.imread(image_file)
+    def get_item_from_h5(self, path):
+        keywords =  path.split("/")
+        dataset  =  keywords[2]
+        level    =  keywords[4]
+        seq      =  keywords[5]
+        item     =  keywords[6]
+        idx      =  int(keywords[7].split("_")[0])
 
-    @staticmethod
-    def depth_read(depth_file):
-        return np.load(depth_file)
+        path_to_h5 = os.path.join(
+            self.root,
+            dataset + ".h5"
+        )
+
+        # Open a new file only if dataset changes
+        if path_to_h5 != self.h5_path:
+            if self.h5 is not None:
+                self.h5.close()  # close previous file safely
+            self.h5 = h5py.File(path_to_h5, 'r')
+            self.h5_path = path_to_h5
+        item = self.h5[level][seq][item][idx]
+        return item
+    
+    def image_read(self, image_file):
+        return self.get_item_from_h5(image_file)
+
+    def depth_read(self, depth_file):
+        return self.get_item_from_h5(depth_file)
 
     def build_frame_graph(self, poses, depths, intrinsics, f=16, max_flow=256):
         """ compute optical flow distance between all pairs of frames """
