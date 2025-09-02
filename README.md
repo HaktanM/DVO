@@ -15,7 +15,8 @@ Create a virtual environment and activate it. Then
 wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
 unzip eigen-3.4.0.zip -d thirdparty
 
-# install 
+# install
+pip install torch --no-build-isolation
 pip install -r requirements.txt --no-build-isolation
 pip install . --no-build-isolation
 
