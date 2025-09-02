@@ -44,10 +44,10 @@ class RGBDDataset(data.Dataset):
 
         self._build_dataset_index()
 
-        # Which h5 file is used the last time
-        self.h5      = None
-        self.h5_path = None 
-                
+        # # Which h5 file is used the last time
+        # self.h5      = None
+        # self.h5_path = None 
+        self.h5_files = {}
 
     def _build_dataset_index(self):
         self.dataset_index = []
@@ -68,19 +68,27 @@ class RGBDDataset(data.Dataset):
         item     =  keywords[6]
         idx      =  int(keywords[7].split("_")[0])
 
-        path_to_h5 = os.path.join(
-            self.root,
-            dataset + ".h5"
-        )
-
-        # Open new file only if dataset changes
-        if path_to_h5 != self.h5_path:
-            if self.h5 is not None:
-                self.h5.close()  # close previous file
-            self.h5 = h5py.File(path_to_h5, 'r')
-            self.h5_path = path_to_h5
-        item_data = self.h5[level][seq][item][idx]
+        if dataset not in self.h5_files:
+            path_to_h5 = os.path.join(self.root, dataset + ".h5")
+            if not os.path.exists(path_to_h5):
+                raise FileNotFoundError(f"HDF5 file not found: {path_to_h5}")
+            self.h5_files[dataset] = h5py.File(path_to_h5, 'r')
+            
+        item_data = self.h5_files[dataset][level][seq][item][idx]
         return item_data
+    
+        # path_to_h5 = os.path.join(
+        #     self.root,
+        #     dataset + ".h5"
+        # )
+
+        # # Open new file only if dataset changes
+        # if path_to_h5 != self.h5_path:
+        #     if self.h5 is not None:
+        #         self.h5.close()  # close previous file
+        #     self.h5 = h5py.File(path_to_h5, 'r')
+        #     self.h5_path = path_to_h5
+        # item_data = self.h5[level][seq][item][idx]
     
     def image_read(self, image_file):
         return self.get_item_from_h5(image_file)
