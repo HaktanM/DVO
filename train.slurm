@@ -14,14 +14,18 @@
 #SBATCH --gres=gpu:1
 #SBATCH -C H100
 
-apptainer exec --nv --no-home --writable --fakeroot \
+apptainer exec --nv --no-home \
     --bind /arf/scratch/hyalcin/datasets/h5:/data \
     --bind /arf/scratch/hyalcin/DVO:/DVO \
-    /arf/scratch/hyalcin/container_dvo \
-    bash -c "
-        source /.venv/bin/activate && \
+    /arf/scratch/hyalcin/container \
+    bash -c '
         cd /DVO && \
+        source venv/bin/activate && \
+        export HOME=/DVO && \
+        nvidia-smi && nvcc --version && \
+        python3 -c "import torch; print(torch.__version__)" && \
+        pip install . --no-build-isolation --no-cache && \
         python3 train_h5.py
-    "
+    '
 exit
 

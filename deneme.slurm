@@ -3,7 +3,7 @@
 #SBATCH -A romer
 #SBATCH --output=/arf/scratch/hyalcin/slurm_outs/%A.out
 #SBATCH --error=/arf/scratch/hyalcin/slurm_outs/%A.err
-#SBATCH --time=00:10:00
+#SBATCH --time=00:20:00
 #SBATCH --job-name=train
 
 #SBATCH --partition=kolyoz-cuda
@@ -14,20 +14,14 @@
 #SBATCH --gres=gpu:1
 #SBATCH -C H100
 
-nvidia-smi 
-
-apptainer exec --nv --no-home  \
+apptainer exec --nv --no-home --writable --fakeroot \
     --bind /arf/scratch/hyalcin/datasets/h5:/data \
     --bind /arf/scratch/hyalcin/DVO:/DVO \
-    /arf/scratch/hyalcin/container \
-    bash -c "
+    /arf/scratch/hyalcin/container_dvo \
+    bash -c '
+        source /env_dvo/bin/activate && \
         cd /DVO && \
-        source venv/bin/activate && \
-        pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu126 && \
-        pip install -r requirements.txt --no-build-isolation --no-cache && \
-        pip install . --no-build-isolation --no-cache
-    "
-
-
+        python3 deneme.py
+    '
 exit
 

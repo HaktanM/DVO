@@ -14,18 +14,17 @@
 #SBATCH --gres=gpu:1
 #SBATCH -C H100
 
-nvidia-smi 
+bash -c "which nvcc"
 
 apptainer exec --nv --no-home  \
     --bind /arf/scratch/hyalcin/datasets/h5:/data \
     --bind /arf/scratch/hyalcin/DVO:/DVO \
-    /arf/scratch/hyalcin/container \
+    /arf/scratch/hyalcin/ubuntu2404 \
     bash -c "
         cd /DVO && \
+        which nvcc && \
         source venv/bin/activate && \
-        pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu126 && \
-        pip install -r requirements.txt --no-build-isolation --no-cache && \
-        pip install . --no-build-isolation --no-cache
+        which nvcc
     "
 
 
