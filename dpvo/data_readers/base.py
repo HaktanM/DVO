@@ -73,7 +73,7 @@ class RGBDDataset(data.Dataset):
             if not os.path.exists(path_to_h5):
                 raise FileNotFoundError(f"HDF5 file not found: {path_to_h5}")
             self.h5_files[dataset] = h5py.File(path_to_h5, 'r')
-            
+
         item_data = self.h5_files[dataset][level][seq][item][idx]
         return item_data
     
@@ -175,8 +175,8 @@ class RGBDDataset(data.Dataset):
 
         images, depths, poses, intrinsics = [], [], [], []
         for i in inds:
-            images.append(self.__class__.image_read(images_list[i]))
-            depths.append(self.__class__.depth_read(depths_list[i]))
+            images.append(self.image_read(images_list[i]))
+            depths.append(self.depth_read(depths_list[i]))
             poses.append(poses_list[i])
             intrinsics.append(intrinsics_list[i])
 
