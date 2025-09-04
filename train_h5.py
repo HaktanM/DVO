@@ -160,7 +160,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--name',    default='layers', help='name your experiment')
     parser.add_argument('--ckpt',    help='checkpoint to restore')
-    parser.add_argument('--h5_path', help='/data')
+    parser.add_argument('--h5_path', default="/data", help='path to h5 files')
     parser.add_argument('--steps', type=int, default=240000)
     parser.add_argument('--lr', type=float, default=0.00008)
     parser.add_argument('--clip', type=float, default=10.0)
