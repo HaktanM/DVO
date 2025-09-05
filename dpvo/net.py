@@ -22,6 +22,9 @@ from . import projective_ops as pops
 autocast = torch.cuda.amp.autocast
 import matplotlib.pyplot as plt
 
+from .dinov3_backbone import make_dinov3_head
+from torchvision import transforms
+
 DIM = 384
 
 class Update(nn.Module):
@@ -96,8 +99,12 @@ class Patchifier(nn.Module):
     def __init__(self, patch_size=3):
         super(Patchifier, self).__init__()
         self.patch_size = patch_size
-        self.fnet = BasicEncoder4(output_dim=128, norm_fn='instance')
-        self.inet = BasicEncoder4(output_dim=DIM, norm_fn='none')
+        # self.fnet = BasicEncoder4(output_dim=128, norm_fn='instance')
+        # self.inet = BasicEncoder4(output_dim=DIM, norm_fn='none')
+        self.dino_dpt = make_dinov3_head(backbone_name="dinov3_vitb16",
+                                         channels=DIM+128,
+                                        pretrained=True,
+                                        backbone_weights="../dinov3/weights/dinov3_vitb16.pth")
 
     def __image_gradient(self, images):
         gray = ((images + 0.5) * (255.0 / 2)).sum(dim=2)
@@ -183,12 +190,19 @@ class VONet(nn.Module):
         self.DIM = DIM
         self.RES = 4
 
+        normalize = transforms.Normalize(
+            mean=(0.485, 0.456, 0.406),
+            std=(0.229, 0.224, 0.225),
+        )
+        self.transform = transforms.Compose([normalize])
+
 
     @autocast(enabled=False)
     def forward(self, images, poses, disps, intrinsics, M=1024, STEPS=12, P=1, structure_only=False, rescale=False):
         """ Estimates SE3 or Sim3 between pair of frames """
 
-        images = 2 * (images / 255.0) - 0.5
+        # images = 2 * (images / 255.0) - 0.5
+        images = self.transform(images / 255.0)
         intrinsics = intrinsics / 4.0
         disps = disps[:, :, 1::4, 1::4].float()
 
