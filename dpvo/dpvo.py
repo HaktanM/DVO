@@ -16,6 +16,8 @@ mp.set_start_method('spawn', True)
 autocast = torch.cuda.amp.autocast
 Id = SE3.Identity(1, device="cuda")
 
+from torchvision import transforms
+
 
 class DPVO:
 
@@ -78,6 +80,12 @@ class DPVO:
         self.viewer = None
         if viz:
             self.start_viewer()
+            
+        normalize = transforms.Normalize(
+            mean=(0.485, 0.456, 0.406),
+            std=(0.229, 0.224, 0.225),
+        )
+        self.transform = transforms.Compose([normalize])
 
     def load_long_term_loop_closure(self):
         try:
@@ -386,8 +394,8 @@ class DPVO:
         if self.viewer is not None:
             self.viewer.update_image(image.contiguous())
 
-        image = 2 * (image[None,None] / 255.0) - 0.5
-        
+        # image = 2 * (image[None,None] / 255.0) - 0.5
+        image = self.transform(image[None,None] / 255.0)
         with autocast(enabled=self.cfg.MIXED_PRECISION):
             fmap, gmap, imap, patches, _, clr = \
                 self.network.patchify(image,
