@@ -104,7 +104,7 @@ class Patchifier(nn.Module):
         self.dino_dpt = make_dinov3_head(backbone_name="dinov3_vitb16",
                                          channels=DIM+128,
                                         pretrained=True,
-                                        backbone_weights="../dinov3/weights/dinov3_vitb16.pth")
+                                        backbone_weights="dinov3/weights/dinov3_vitb16.pth")
 
     def __image_gradient(self, images):
         gray = ((images + 0.5) * (255.0 / 2)).sum(dim=2)

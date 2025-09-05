@@ -91,6 +91,8 @@ def make_dinov3_head(
     use_cls_token=False,
     **kwargs,
 ):
+    
+    print(f"backbone_weights : {backbone_weights}")
     backbone: torch.nn.Module = _BACKBONE_DICT[backbone_name](
         pretrained=pretrained,
         weights=backbone_weights,
