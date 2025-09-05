@@ -14,13 +14,15 @@
 #SBATCH --gres=gpu:1
 #SBATCH -C H100
 
-apptainer exec --nv --no-home --writable --fakeroot \
+
+apptainer exec --nv --no-home --writable \
     --bind /arf/scratch/hyalcin/datasets/h5:/data \
     --bind /arf/scratch/hyalcin/DVO:/DVO \
-    /arf/scratch/hyalcin/container_dvo \
+    /arf/scratch/hyalcin/container \
     bash -c '
-        source /env_dvo/bin/activate && \
+        nvidia-smi & \
         cd /DVO && \
+        source venv/bin/activate && \
         python3 deneme.py
     '
 exit
