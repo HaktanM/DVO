@@ -3,7 +3,7 @@
 #SBATCH -A romer
 #SBATCH --output=/arf/scratch/hyalcin/slurm_outs/%A.out
 #SBATCH --error=/arf/scratch/hyalcin/slurm_outs/%A.err
-#SBATCH --time=00:20:00
+#SBATCH --time=3-00:00:00
 #SBATCH --job-name=train
 
 #SBATCH --partition=kolyoz-cuda
@@ -14,17 +14,17 @@
 #SBATCH --gres=gpu:1
 #SBATCH -C H100
 
+export EVO_ASSETS_PATH=/data
+
 apptainer exec --nv --no-home \
     --bind /arf/scratch/hyalcin/datasets/h5:/data \
     --bind /arf/scratch/hyalcin/DVO:/DVO \
     /arf/scratch/hyalcin/container \
     bash -c '
+        source /env/bin/activate && \
         cd /DVO && \
-        source venv/bin/activate && \
+        export EVO_ASSETS_PATH=/data && \
         export HOME=/DVO && \
-        nvidia-smi && nvcc --version && \
-        python3 -c "import torch; print(torch.__version__)" && \
-        pip install . --no-build-isolation --no-cache && \
         python3 train_h5.py
     '
 exit
