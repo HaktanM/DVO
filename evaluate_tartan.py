@@ -117,7 +117,7 @@ def evaluate(config, net, split="validation", trials=1, plot=False, save=False):
         seq      =  keywords[3]
         print(f"Validation on : {dataset}, {level}, {seq}")
 
-        root = "/mnt/elements/tartan_air"
+        root = "/data"
         path_to_h5 = os.path.join(root, dataset + ".h5")
         data = h5py.File(path_to_h5, 'r')
         traj_ref = data[level][seq]["pose_left"][()] 
