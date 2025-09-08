@@ -68,3 +68,13 @@ class TartanAir(RGBDDataset):
     @staticmethod
     def calib_read():
         return np.array([320.0, 320.0, 320.0, 240.0])
+    
+    def image_read(self, image_file):
+        return self.get_item_from_h5(image_file)
+
+    def depth_read(self, depth_file):
+        print(f"Reading the depth : {depth_file}")
+        depth = self.get_item_from_h5(depth_file) / TartanAir.DEPTH_SCALE
+        depth[depth==np.nan] = 1.0
+        depth[depth==np.inf] = 1.0
+        return depth

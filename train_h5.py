@@ -158,7 +158,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name',    default='layers', help='name your experiment')
+    parser.add_argument('--name',    default='/DinoVO', help='name your experiment')
     parser.add_argument('--ckpt',    help='checkpoint to restore')
     parser.add_argument('--h5_path', default="/data", help='path to h5 files')
     parser.add_argument('--steps', type=int, default=240000)
