@@ -120,8 +120,17 @@ class EncoderDecoder(torch.nn.Module):
         self.encoder_dtype = encoder_dtype
         self.decoder_dtype = decoder_dtype
         self.is_cuda = torch.cuda.is_available()
+        # for name, param in self.encoder.named_parameters():
+        #     if "blocks.11" in name or "blocks.10" in name or "blocks.9" in name:
+        #         param.requires_grad = True
+        #     if "backbone.norm" in name:
+        #         param.requires_grad = True
+                # print(name, param.requires_grad)
         for param in self.encoder.parameters():
             param.requires_grad = False
+        # for param in self.decoder.parameters():
+        #     param.requires_grad = True
+        pass
 
     def forward(self, x):
         self.encoder.eval()
@@ -181,10 +190,11 @@ def build_head(
     #     bins_strategy=bins_strategy,
     #     norm_strategy=norm_strategy,
     # )
-
-    return EncoderDecoder(
+    encoder_decoder = EncoderDecoder(
             encoder,
             decoder,
             encoder_dtype=encoder_dtype,
             decoder_dtype=decoder_dtype,
         )
+
+    return encoder_decoder

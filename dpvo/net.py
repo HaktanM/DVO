@@ -201,7 +201,7 @@ class VONet(nn.Module):
         self.transform = transforms.Compose([normalize])
 
 
-    @autocast(enabled=False)
+    # @autocast(enabled=False)
     def forward(self, images, poses, disps, intrinsics, M=1024, STEPS=12, P=1, structure_only=False, rescale=False):
         """ Estimates SE3 or Sim3 between pair of frames """
 

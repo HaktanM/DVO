@@ -172,6 +172,7 @@ class ConvModule(nn.Module):
             self.norm_name = "bn"
         else:
             self.norm_name = None  # type: ignore
+        self.instance_norm = nn.InstanceNorm2d(out_channels)
 
         # build activation layer
         if self.with_activation:
@@ -220,8 +221,8 @@ class ConvModule(nn.Module):
                 if self.with_explicit_padding:
                     x = self.padding_layer(x)
                 x = self.conv(x)
-            elif layer == "norm" and norm and self.with_norm:
-                x = self.norm(x)
+            elif layer == "norm": # and norm and self.with_norm:
+                x = self.instance_norm(x)
             elif layer == "act" and activate and self.with_activation:
                 x = self.activate(x)
         return x
@@ -502,6 +503,8 @@ class DPTHead(nn.Module):
         assert self.num_fusion_blocks == self.num_reassemble_blocks
         assert self.num_reassemble_blocks == self.num_post_process_channels
         # self.conv_depth = UpConvHead(self.channels, self.n_output_channels)
+        self.final_proj = nn.Conv2d(self.channels, self.channels, kernel_size=1, stride=1, padding=0)
+        
 
     def forward_features(self, inputs):
         assert (
@@ -517,6 +520,7 @@ class DPTHead(nn.Module):
             out = self.fusion_blocks[i](out, x[-(i + 1)])
 
         out = self.project(out)
+        out = self.final_proj(out)
         return out
 
     def forward(self, inputs):

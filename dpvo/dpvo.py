@@ -254,11 +254,11 @@ class DPVO:
         net = torch.zeros(1, len(ii), self.DIM, **self.kwargs)
         coords = self.reproject(indicies=(ii, jj, kk))
 
-        with autocast(enabled=self.cfg.MIXED_PRECISION):
-            corr = self.corr(coords, indicies=(kk, jj))
-            ctx = self.imap[:,kk % (self.M * self.pmem)]
-            net, (delta, weight, _) = \
-                self.network.update(net, ctx, corr, None, ii, jj, kk)
+        # with autocast(enabled=self.cfg.MIXED_PRECISION):
+        corr = self.corr(coords, indicies=(kk, jj))
+        ctx = self.imap[:,kk % (self.M * self.pmem)]
+        net, (delta, weight, _) = \
+            self.network.update(net, ctx, corr, None, ii, jj, kk)
 
         return torch.quantile(delta.norm(dim=-1).float(), 0.5)
 
@@ -337,11 +337,11 @@ class DPVO:
         with Timer("other", enabled=self.enable_timing):
             coords = self.reproject()
 
-            with autocast(enabled=True):
-                corr = self.corr(coords)
-                ctx = self.imap[:, self.pg.kk % (self.M * self.pmem)]
-                self.pg.net, (delta, weight, _) = \
-                    self.network.update(self.pg.net, ctx, corr, None, self.pg.ii, self.pg.jj, self.pg.kk)
+            # with autocast(enabled=True):
+            corr = self.corr(coords)
+            ctx = self.imap[:, self.pg.kk % (self.M * self.pmem)]
+            self.pg.net, (delta, weight, _) = \
+                self.network.update(self.pg.net, ctx, corr, None, self.pg.ii, self.pg.jj, self.pg.kk)
 
             lmbda = torch.as_tensor([1e-4], device="cuda")
             weight = weight.float()
@@ -396,12 +396,12 @@ class DPVO:
 
         # image = 2 * (image[None,None] / 255.0) - 0.5
         image = self.transform(image[None,None] / 255.0)
-        with autocast(enabled=self.cfg.MIXED_PRECISION):
-            fmap, gmap, imap, patches, _, clr = \
-                self.network.patchify(image,
-                    patches_per_image=self.cfg.PATCHES_PER_FRAME, 
-                    centroid_sel_strat=self.cfg.CENTROID_SEL_STRAT, 
-                    return_color=True)
+        #with autocast(enabled=self.cfg.MIXED_PRECISION):
+        fmap, gmap, imap, patches, _, clr = \
+            self.network.patchify(image,
+                patches_per_image=self.cfg.PATCHES_PER_FRAME, 
+                centroid_sel_strat=self.cfg.CENTROID_SEL_STRAT, 
+                return_color=True)
 
         ### update state attributes ###
         self.tlist.append(tstamp)
