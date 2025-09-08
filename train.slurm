@@ -10,7 +10,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
-#SBATCH --job-name=printGPU
+#SBATCH --job-name=deneme
 #SBATCH --gres=gpu:1
 #SBATCH -C H100
 
@@ -25,7 +25,7 @@ apptainer exec --nv --no-home \
         cd /DVO && \
         export EVO_ASSETS_PATH=/data && \
         export HOME=/DVO && \
-        python3 train_h5.py
+        python3 train_h5.py --name DinoVO
     '
 exit
 

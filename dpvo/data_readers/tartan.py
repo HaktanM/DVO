@@ -73,7 +73,6 @@ class TartanAir(RGBDDataset):
         return self.get_item_from_h5(image_file)
 
     def depth_read(self, depth_file):
-        print(f"Reading the depth : {depth_file}")
         depth = self.get_item_from_h5(depth_file) / TartanAir.DEPTH_SCALE
         depth[depth==np.nan] = 1.0
         depth[depth==np.inf] = 1.0
