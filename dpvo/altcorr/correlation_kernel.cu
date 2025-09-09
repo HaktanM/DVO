@@ -91,10 +91,10 @@ __global__ void corr_forward_kernel(int R,
   // diameter
   const int D = 2*R + 2;
 
-  const int B = coords.size(0);
-  const int M = coords.size(1);
-  const int H = coords.size(3);
-  const int W = coords.size(4);
+  const int B = coords.size(0);   // Batch Size
+  const int M = coords.size(1);   // Number of pairs to compute correlation volume
+  const int H = coords.size(3);   // Height of the patch 
+  const int W = coords.size(4);   // Width of the patch
 
   const int C = fmap1.size(2);
   const int H2 = fmap2.size(3);
@@ -105,12 +105,12 @@ __global__ void corr_forward_kernel(int R,
   if (n < B * M * H * W * D * D) {
     const int jj = n % D; n /= D;
     const int ii = n % D; n /= D;
-    const int j0 = n % W; n /= W;
-    const int i0 = n % H; n /= H;
-    const int  m = n % M; n /= M;
+    const int j0 = n % W; n /= W; // vertical coordinate in the patch
+    const int i0 = n % H; n /= H; // horizontal coordinate in the patch
+    const int  m = n % M; n /= M; // Index of the correlation pair
 
-    const int ix = us[m];
-    const int jx = vs[m];
+    const int ix = us[m];  // Patch id
+    const int jx = vs[m];  // Target frame id
 
     const float x = coords[n][m][0][i0][j0];
     const float y = coords[n][m][1][i0][j0];

@@ -28,7 +28,7 @@ from torchvision import transforms
 DIM = 384
 
 class Update(nn.Module):
-    def __init__(self, p):
+    def __init__(self, p, r=3):
         super(Update, self).__init__()
 
         self.c1 = nn.Sequential(
@@ -54,7 +54,7 @@ class Update(nn.Module):
         )
 
         self.corr = nn.Sequential(
-            nn.Linear(2*49*p*p, DIM),
+            nn.Linear(2*(2*r+1)*(2*r+1)*p*p, DIM),
             nn.ReLU(inplace=True),
             nn.Linear(DIM, DIM),
             nn.LayerNorm(DIM, eps=1e-3),
@@ -188,8 +188,9 @@ class VONet(nn.Module):
     def __init__(self, use_viewer=False):
         super(VONet, self).__init__()
         self.P = 3
+        self.R = 3
         self.patchify = Patchifier(self.P)
-        self.update = Update(self.P)
+        self.update = Update(self.P, self.R)
 
         self.DIM = DIM
         self.RES = 4
@@ -212,7 +213,7 @@ class VONet(nn.Module):
 
         fmap, gmap, imap, patches, ix = self.patchify(images, disps=disps)
 
-        corr_fn = CorrBlock(fmap, gmap)
+        corr_fn = CorrBlock(fmap, gmap, radius=self.R)
 
         b, N, c, h, w = fmap.shape
         p = self.P
