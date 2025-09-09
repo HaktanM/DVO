@@ -50,7 +50,7 @@ def train(args):
     db = dataset_factory(['tartan'], datapath=args.h5_path, n_frames=args.n_frames)
     train_loader = DataLoader(db, batch_size=1, shuffle=True, num_workers=4)
 
-    net = VONet(P = args.P, P = args.R)
+    net = VONet(P = args.P, R = args.R)
     net.train()
     net.cuda()
 
