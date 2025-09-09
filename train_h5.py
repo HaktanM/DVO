@@ -50,7 +50,7 @@ def train(args):
     db = dataset_factory(['tartan'], datapath=args.h5_path, n_frames=args.n_frames)
     train_loader = DataLoader(db, batch_size=1, shuffle=True, num_workers=4)
 
-    net = VONet()
+    net = VONet(P = args.P, P = args.R)
     net.train()
     net.cuda()
 
@@ -148,9 +148,9 @@ def train(args):
                     PATH = 'checkpoints/%s_%06d.pth' % (args.name, total_steps)
                     torch.save(net.state_dict(), PATH)
 
-                validation_results = validate(None, net)
-                if rank == 0:
-                    logger.write_dict(validation_results)
+                # validation_results = validate(None, net)
+                # if rank == 0:
+                #     logger.write_dict(validation_results)
 
                 torch.cuda.empty_cache()
                 net.train()
@@ -167,6 +167,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_frames', type=int, default=15)
     parser.add_argument('--pose_weight', type=float, default=10.0)
     parser.add_argument('--flow_weight', type=float, default=0.1)
+    parser.add_argument('--P', type=int, required=True)
+    parser.add_argument('--R', type=int, required=True)
     args = parser.parse_args()
 
     train(args)

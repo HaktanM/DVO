@@ -25,7 +25,6 @@ apptainer exec --nv --no-home \
         cd /DVO && \
         export EVO_ASSETS_PATH=/data && \
         export HOME=/DVO && \
-        python3 train_h5.py --name DinoVO
+        python3 train_h5.py --P 3 --R 3--name DC3X3
     '
 exit
-

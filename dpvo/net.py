@@ -185,12 +185,14 @@ class CorrBlock:
 
 
 class VONet(nn.Module):
-    def __init__(self, use_viewer=False):
+    def __init__(self, P=3, R=3, use_viewer=False):
         super(VONet, self).__init__()
-        self.P = 3
-        self.R = 3
+        self.P = P
+        self.R = R
         self.patchify = Patchifier(self.P)
         self.update = Update(self.P, self.R)
+
+        print(f"P : {self.P}, R : {self.R}")
 
         self.DIM = DIM
         self.RES = 4
