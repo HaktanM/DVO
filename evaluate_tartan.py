@@ -18,6 +18,9 @@ from dpvo.dpvo import DPVO
 from dpvo.plot_utils import plot_trajectory
 from dpvo.utils import Timer
 
+import h5py
+
+
 test_split = \
     ["MH%03d"%i for i in range(8)] + \
     ["ME%03d"%i for i in range(8)]
@@ -57,6 +60,31 @@ def run(imagedir, cfg, network, viz=False, show_img=False):
     return slam.terminate()
 
 
+
+def image_iterator(images):
+    data_list = []
+    for image in images[::STRIDE]:
+        image = torch.from_numpy(image).permute(2,0,1)
+        intrinsics = torch.as_tensor([fx, fy, cx, cy])
+        data_list.append((image, intrinsics))
+
+    for (image, intrinsics) in data_list:
+        yield image.cuda(), intrinsics.cuda()
+
+@torch.no_grad()
+def run_with_images(images, cfg, network, viz=False, show_img=False):
+    slam = DPVO(cfg, network, ht=480, wd=640, viz=viz)
+
+    for t, (image, intrinsics) in enumerate(image_iterator(images)):
+        if show_img:
+            show_image(image, 1)
+        
+        with Timer("SLAM", enabled=False):
+            slam(t, image, intrinsics)
+
+    return slam.terminate()
+
+
 def ate(traj_ref, traj_est):
     assert isinstance(traj_ref, PoseTrajectory3D)
     assert isinstance(traj_est, PoseTrajectory3D)
@@ -83,23 +111,35 @@ def evaluate(config, net, split="validation", trials=1, plot=False, save=False):
     all_results = []
     for i, scene in enumerate(scenes):
 
+        keywords =  scene.split("/")
+        dataset  =  keywords[0]
+        level    =  keywords[2]
+        seq      =  keywords[3]
+        print(f"Validation on : {dataset}, {level}, {seq}")
+
+        root = "/data"
+        path_to_h5 = os.path.join(root, dataset + ".h5")
+        data = h5py.File(path_to_h5, 'r')
+        traj_ref = data[level][seq]["pose_left"][()] 
+        images = data[level][seq]["image_left"][()]
+
         results[scene] = []
         for j in range(trials):
 
-            # estimated trajectory
-            if split == 'test':
-                scene_path = os.path.join("datasets/mono", scene)
-                traj_ref = osp.join("datasets/mono", "mono_gt", scene + ".txt")
+            # # estimated trajectory
+            # if split == 'test':
+            #     scene_path = os.path.join("datasets/mono", scene)
+            #     traj_ref = osp.join("datasets/mono", "mono_gt", scene + ".txt")
             
-            elif split == 'validation':
-                scene_path = os.path.join("datasets/TartanAir", scene, "image_left")
-                traj_ref = osp.join("datasets/TartanAir", scene, "pose_left.txt")
+            # elif split == 'validation':
+            #     scene_path = os.path.join("datasets/TartanAir", scene, "image_left")
+            #     traj_ref = osp.join("datasets/TartanAir", scene, "pose_left.txt")
 
             # run the slam system
-            traj_est, tstamps = run(scene_path, config, net, viz=False, show_img=False)
+            traj_est, tstamps = run_with_images(images, config, net, viz=False, show_img=False)
 
             PERM = [1, 2, 0, 4, 5, 3, 6] # ned -> xyz
-            traj_ref = np.loadtxt(traj_ref, delimiter=" ")[::STRIDE, PERM]
+            traj_ref = traj_ref[::STRIDE, PERM]
 
             traj_est = PoseTrajectory3D(
                 positions_xyz=traj_est[:,:3],
@@ -126,6 +166,7 @@ def evaluate(config, net, split="validation", trials=1, plot=False, save=False):
                 Path("saved_trajectories").mkdir(exist_ok=True)
                 file_interface.write_tum_trajectory_file(f"saved_trajectories/TartanAir_{scene_name}_Trial{j+1:02d}.txt", traj_est)
 
+        data.close()
         print(scene, sorted(results[scene]))
 
     results_dict = dict([("Tartan/{}".format(k), np.median(v)) for (k, v) in results.items()])

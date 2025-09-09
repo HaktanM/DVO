@@ -162,3 +162,8 @@ datasets/TartanAir.pickle
 datasets/TartanAir
 TartanAirResults
 thirdparty/*
+
+
+# Run time temporal folders
+.evo/
+.nv/
