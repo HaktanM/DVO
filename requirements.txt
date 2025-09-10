@@ -11,3 +11,4 @@ plyfile
 evo
 opencv-python
 yacs
+h5py

@@ -105,7 +105,7 @@ class DPVO:
                 if "update.lmbda" not in k:
                     new_state_dict[k.replace('module.', '')] = v
             
-            self.network = VONet()
+            self.network = VONet(self.cfg)
             self.network.load_state_dict(new_state_dict)
 
         else:

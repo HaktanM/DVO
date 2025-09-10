@@ -167,3 +167,5 @@ thirdparty/*
 # Run time temporal folders
 .evo/
 .nv/
+EstimatedTrajectories/
+datasets/

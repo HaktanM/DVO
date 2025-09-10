@@ -96,15 +96,15 @@ class Update(nn.Module):
 
 
 class Patchifier(nn.Module):
-    def __init__(self, patch_size=3):
+    def __init__(self, args):
         super(Patchifier, self).__init__()
-        self.patch_size = patch_size
+        self.patch_size = args.P
         # self.fnet = BasicEncoder4(output_dim=128, norm_fn='instance')
         # self.inet = BasicEncoder4(output_dim=DIM, norm_fn='none')
-        self.dino_dpt = make_dinov3_head(backbone_name="dinov3_vitb16",
+        self.dino_dpt = make_dinov3_head(backbone_name=args.DINO_MODEL,
                                          channels=DIM+128,
                                         pretrained=True,
-                                        backbone_weights="dinov3/weights/dinov3_vitb16.pth")
+                                        backbone_weights=args.PATH_DINO_WEIGHTS)
 
     def __image_gradient(self, images):
         gray = ((images + 0.5) * (255.0 / 2)).sum(dim=2)
@@ -185,11 +185,11 @@ class CorrBlock:
 
 
 class VONet(nn.Module):
-    def __init__(self, P=3, R=3, use_viewer=False):
+    def __init__(self, args, use_viewer=False):
         super(VONet, self).__init__()
-        self.P = P
-        self.R = R
-        self.patchify = Patchifier(self.P)
+        self.P = args.P
+        self.R = args.R
+        self.patchify = Patchifier(args)
         self.update = Update(self.P, self.R)
 
         print(f"P : {self.P}, R : {self.R}")

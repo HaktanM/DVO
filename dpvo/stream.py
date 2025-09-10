@@ -23,6 +23,11 @@ def image_stream(queue, imagedir, calib, stride, skip=0):
 
     for t, imfile in enumerate(image_list):
         image = cv2.imread(str(imfile))
+        h, w = image.shape[:2]
+        new_h = h - (h % 32)
+        new_w = w - (w % 32)
+        image = image[:new_h, :new_w]
+
         if len(calib) > 4:
             image = cv2.undistort(image, K, calib[4:])
 
