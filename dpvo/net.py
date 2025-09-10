@@ -174,9 +174,10 @@ class CorrBlock:
 
 
 class VONet(nn.Module):
-    def __init__(self, use_viewer=False):
+    def __init__(self, args, use_viewer=False):
         super(VONet, self).__init__()
-        self.P = 3
+        self.args = args
+        self.P = self.args.P
         self.patchify = Patchifier(self.P)
         self.update = Update(self.P)
 

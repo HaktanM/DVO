@@ -22,7 +22,7 @@ from dpvo.utils import Timer
 def write_trajectory(path, seq, traj, times, trial_id):
     folder_path = os.path.join(path, str(trial_id).zfill(2))
     if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
+        os.makedirs(folder_path)
     traj_path = os.path.join(folder_path, seq + ".txt")
     with open(traj_path, 'w') as file:
         for idx in range(len(times)):
