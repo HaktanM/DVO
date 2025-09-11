@@ -84,7 +84,7 @@ def validateEuRoC(args, cfg, net):
 
 
             # Get the groundtruth
-            groundtruth = "datasets/euroc_groundtruth/{}.txt".format(scene) 
+            groundtruth = "/home/haktanito/workspace/DPVO/datasets/euroc_groundtruth/{}.txt".format(scene) 
             traj_ref = file_interface.read_tum_trajectory_file(groundtruth)
             
             # Sync estimated trajectory with groundtruth
@@ -109,6 +109,7 @@ if __name__=="__main__":
         "DVOl16",
         "DVOb16",
         "DVOs16plus",
+        "DVOb16_lr_4e-5"
     ]
 
     # model_list = [
@@ -119,19 +120,22 @@ if __name__=="__main__":
         model_list[0] : "dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd",
         model_list[1] : "dinov3_vitb16",
         model_list[2] : "dinov3_vits16plus_pretrain_lvd1689m-4057cbaa",
+        model_list[3] : "dinov3_vitb16",
     }
 
     dino_model_dict = {
         model_list[0] : "dinov3_vitl16",
         model_list[1] : "dinov3_vitb16",
         model_list[2] : "dinov3_vits16plus",
+        model_list[3] : "dinov3_vitb16",
     }
 
 
     iteration_list = [
-        "040000",
         "050000",
         "070000",
+        "080000",
+        "090000",
     ]
 
     for iteration in iteration_list:
