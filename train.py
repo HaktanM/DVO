@@ -71,7 +71,7 @@ def train(args):
     rank = 0
     seeding(0)
 
-    db = dataset_factory(['tartan'], datapath="/project_data/datasets/TartanAir", n_frames=args.n_frames, test=args.test)
+    db = dataset_factory(['tartan'], datapath="/data", n_frames=args.n_frames, test=args.test)
     train_loader = DataLoader(db, batch_size=1, shuffle=True, num_workers=4)
 
     net = VONet(args)
