@@ -70,7 +70,11 @@ def train(args):
         logger = Logger(args.name, scheduler)
 
     total_steps = 0
-
+    flow_coeff = 1.0
+    ro_coeff = 1.0
+    flow_coeff_ratios = []
+    ro_coeff_ratios = []
+    STEPS = args.iters
     while 1:
         for data_blob in train_loader:
             images, poses, disps, intrinsics = [x.cuda().float() for x in data_blob]
@@ -201,6 +205,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_frames', type=int, default=15)
     parser.add_argument('--pose_weight', type=float, default=10.0)
     parser.add_argument('--flow_weight', type=float, default=0.1)
+    parser.add_argument('--iters', type=int, default=18)
 
     ## Patch size and radius of correlation window
     parser.add_argument('--P', type=int, default=3)
