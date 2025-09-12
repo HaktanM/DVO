@@ -54,7 +54,7 @@ class Update(nn.Module):
         )
 
         self.corr = nn.Sequential(
-            nn.Linear(2*(2*cfg.R+1)*cfg.P*cfg.P, DIM),
+            nn.Linear(2*(2*cfg.R+1)*(2*cfg.R+1)*cfg.P*cfg.P, DIM),
             nn.ReLU(inplace=True),
             nn.Linear(DIM, DIM),
             nn.LayerNorm(DIM, eps=1e-3),
@@ -179,7 +179,7 @@ class CorrBlock:
 class VONet(nn.Module):
     def __init__(self, cfg, use_viewer=False):
         super(VONet, self).__init__()
-        self.P = 3
+        self.P = cfg.P
         self.patchify = Patchifier(cfg)
         self.update = Update(cfg)
 

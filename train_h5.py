@@ -170,8 +170,8 @@ if __name__ == '__main__':
     parser.add_argument('--flow_weight', type=float, default=0.1)
 
     ## Patch size and radius of correlation window
-    parser.add_argument('--P', type=int, default=1)
-    parser.add_argument('--R', type=int, default=1)
+    parser.add_argument('--P', type=int, default=3)
+    parser.add_argument('--R', type=int, default=3)
 
     ## Dino related arguments
     parser.add_argument('--DINE_MODEL', type=str, default="dinov3_vits16plus")
