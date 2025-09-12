@@ -40,28 +40,28 @@ if __name__ == "__main__":
     
     dvo_head = getDinoHead(cfg)
     
-    x = torch.rand(1,1,3,300,300)
-    fmap, imap = dvo_head.forward(x)
+    # x = torch.rand(1,1,3,300,300)
+    # fmap, imap = dvo_head.forward(x)
 
-    # --- Check which parameters are trainable ---
-    print("Trainable parameters in the model:")
-    trainable_params_count = 0
-    for name, param in dvo_head.named_parameters():
-        print(f"Name: {name}, requires_grad: {param.requires_grad}, shape: {param.shape}")
-        if param.requires_grad:
-            trainable_params_count += param.numel()
+    # # --- Check which parameters are trainable ---
+    # print("Trainable parameters in the model:")
+    # trainable_params_count = 0
+    # for name, param in dvo_head.named_parameters():
+    #     print(f"Name: {name}, requires_grad: {param.requires_grad}, shape: {param.shape}")
+    #     if param.requires_grad:
+    #         trainable_params_count += param.numel()
 
-    print(f"\nTotal number of trainable parameters: {trainable_params_count}")
+    # print(f"\nTotal number of trainable parameters: {trainable_params_count}")
 
-    # # Assume 'backbone' is your instantiated DINOv3 model
-    # model_graph = draw_graph(
-    #     dvo_head, 
-    #     input_size=(1, 3, 224, 224), 
-    #     expand_nested=True # This shows the internal layers of blocks
-    # )
+    # Assume 'backbone' is your instantiated DINOv3 model
+    model_graph = draw_graph(
+        dvo_head, 
+        input_size=(1, 1, 3, 224, 224), 
+        expand_nested=True # This shows the internal layers of blocks
+    )
 
-    # # To view the graph
-    # model_graph.visual_graph
+    # To view the graph
+    model_graph.visual_graph
 
-    # # To save the graph as a file (e.g., a PNG)
-    # model_graph.visual_graph.render("dinov3_backbone", format="svg")
+    # To save the graph as a file (e.g., a PNG)
+    model_graph.visual_graph.render("dinov3_backbone", format="svg")

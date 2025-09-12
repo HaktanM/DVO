@@ -154,11 +154,11 @@ def train(args):
 
             loss = flow_coeff*flow_loss + pose_loss
             
-            if not args.test:
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
-                optimizer.step()
-                scheduler.step()
+       
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(net.parameters(), args.clip)
+            optimizer.step()
+            scheduler.step()
 
             total_steps += 1
 
