@@ -133,14 +133,9 @@ if __name__=="__main__":
 
 
     iteration_list = [
-        "030000",
-        "040000",
-        "050000",
-        "060000",
         "070000",
         "080000",
         "090000",
-        "100000"
     ]
 
     for iteration in iteration_list:
