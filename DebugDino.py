@@ -16,7 +16,7 @@ model_list = [
 dino_weight_dict = {
     model_list[0] : "dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd",
     model_list[1] : "dinov3_vitb16",
-    model_list[2] : "dinov3_vits16plus_pretrain_lvd1689m-4057cbaa",
+    model_list[2] : "dinov3_vits16plus",
 }
 
 
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     
     dvo_head = getDinoHead(cfg)
     
-    x = torch.rand(1,3,300,300)
+    x = torch.rand(1,1,3,300,300)
     fmap, imap = dvo_head.forward(x)
 
     # --- Check which parameters are trainable ---

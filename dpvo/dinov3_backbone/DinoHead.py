@@ -88,6 +88,12 @@ class DVOHead(torch.nn.Module):
             param.requires_grad = False
 
     def forward(self, x):
+        # b : batch size
+        # n : number of images
+        # c1 : channel size of the input
+        b, n, c1, h1, w1 = x.shape
+        x = x.view(b*n, c1, h1, w1)
+
         self.encoder.eval()
 
         x = x.reshape(-1, *x.shape[-3:])
@@ -106,7 +112,10 @@ class DVOHead(torch.nn.Module):
         fmap = self.fnet(concatenated_fmap)
         imap = self.inet(concatenated_fmap)
 
-        return fmap, imap
+        _, cf, hf, wf = fmap.shape
+        _, ci, hi, wi = imap.shape
+        
+        return fmap.view(b, n, cf, hf, wf), imap.view(b, n, ci, hi, wi)
 
 
 def getDinoHead(
