@@ -185,7 +185,7 @@ class VONet(nn.Module):
         self.update = Update(cfg)
 
         self.DIM = DIM
-        self.RES = 4
+        self.RES = 16
 
         normalize = transforms.Normalize(
             mean=(0.485, 0.456, 0.406),
