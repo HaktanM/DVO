@@ -1,24 +1,18 @@
-import datetime
+import cv2
 import glob
 import os
+import datetime
+import numpy as np
 import os.path as osp
 from pathlib import Path
 
-import cv2
-import evo.main_ape as main_ape
-import numpy as np
 import torch
-from evo.core.metrics import PoseRelation
-from evo.core.trajectory import PoseTrajectory3D
-from evo.tools import file_interface
-
-from dpvo.config import cfg
-from dpvo.data_readers.tartan import test_split as val_split
 from dpvo.dpvo import DPVO
-from dpvo.plot_utils import plot_trajectory
 from dpvo.utils import Timer
+from dpvo.config import cfg
 
-import h5py
+from dpvo.data_readers.tartan import test_split as val_split
+from dpvo.plot_utils import plot_trajectory, save_trajectory_tum_format
 
 
 test_split = \
@@ -47,47 +41,37 @@ def video_iterator(imagedir, ext=".png", preload=True):
         yield image.cuda(), intrinsics.cuda()
 
 @torch.no_grad()
-def run(imagedir, cfg, network, viz=False, show_img=False):
+def run(imagedir, cfg, network, viz=False):
     slam = DPVO(cfg, network, ht=480, wd=640, viz=viz)
 
     for t, (image, intrinsics) in enumerate(video_iterator(imagedir)):
-        if show_img:
+        if viz: 
             show_image(image, 1)
         
         with Timer("SLAM", enabled=False):
             slam(t, image, intrinsics)
 
-    return slam.terminate()
-
-
-
-def image_iterator(images):
-    data_list = []
-    for image in images[::STRIDE]:
-        image = torch.from_numpy(image).permute(2,0,1)
-        intrinsics = torch.as_tensor([fx, fy, cx, cy])
-        data_list.append((image, intrinsics))
-
-    for (image, intrinsics) in data_list:
-        yield image.cuda(), intrinsics.cuda()
-
-@torch.no_grad()
-def run_with_images(images, cfg, network, viz=False, show_img=False):
-    slam = DPVO(cfg, network, ht=480, wd=640, viz=viz)
-
-    for t, (image, intrinsics) in enumerate(image_iterator(images)):
-        if show_img:
-            show_image(image, 1)
-        
-        with Timer("SLAM", enabled=False):
-            slam(t, image, intrinsics)
+    for _ in range(12):
+        slam.update()
 
     return slam.terminate()
 
 
-def ate(traj_ref, traj_est):
-    assert isinstance(traj_ref, PoseTrajectory3D)
-    assert isinstance(traj_est, PoseTrajectory3D)
+def ate(traj_ref, traj_est, timestamps):
+    import evo
+    import evo.main_ape as main_ape
+    from evo.core.trajectory import PoseTrajectory3D
+    from evo.core.metrics import PoseRelation
+
+    traj_est = PoseTrajectory3D(
+        positions_xyz=traj_est[:,:3],
+        orientations_quat_wxyz=traj_est[:,3:],
+        timestamps=timestamps)
+
+    traj_ref = PoseTrajectory3D(
+        positions_xyz=traj_ref[:,:3],
+        orientations_quat_wxyz=traj_ref[:,3:],
+        timestamps=timestamps)
     
     result = main_ape.ape(traj_ref, traj_est, est_name='traj', 
         pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
@@ -96,7 +80,8 @@ def ate(traj_ref, traj_est):
 
 
 @torch.no_grad()
-def evaluate(config, net, split="validation", trials=1, plot=False, save=False):
+def evaluate(config, net, save_str, split="validation", trials=1, plot=False, save=False):
+    root_dataset = "/project_data/"
 
     if config is None:
         config = cfg
@@ -111,72 +96,58 @@ def evaluate(config, net, split="validation", trials=1, plot=False, save=False):
     all_results = []
     for i, scene in enumerate(scenes):
 
-        keywords =  scene.split("/")
-        dataset  =  keywords[0]
-        level    =  keywords[2]
-        seq      =  keywords[3]
-        print(f"Validation on : {dataset}, {level}, {seq}")
-
-        root = "/data"
-        path_to_h5 = os.path.join(root, dataset + ".h5")
-        data = h5py.File(path_to_h5, 'r')
-        traj_ref = data[level][seq]["pose_left"][()] 
-        images = data[level][seq]["image_left"][()]
-
         results[scene] = []
         for j in range(trials):
 
-            # # estimated trajectory
-            # if split == 'test':
-            #     scene_path = os.path.join("datasets/mono", scene)
-            #     traj_ref = osp.join("datasets/mono", "mono_gt", scene + ".txt")
+            # estimated trajectory
+            if split == 'test':
+                scene_path = os.path.join(root_dataset + "datasets/TartanAir_test/mono", scene)
+                traj_ref = osp.join(root_dataset + "datasets/TartanAir_test/mono_gt", scene + ".txt")
             
-            # elif split == 'validation':
-            #     scene_path = os.path.join("datasets/TartanAir", scene, "image_left")
-            #     traj_ref = osp.join("datasets/TartanAir", scene, "pose_left.txt")
+            elif split == 'validation':
+                scene_path = os.path.join(root_dataset + "datasets/TartanAir", scene, "image_left")
+                traj_ref = osp.join(root_dataset + "datasets/TartanAir", scene, "pose_left.txt")
 
             # run the slam system
-            traj_est, tstamps = run_with_images(images, config, net, viz=False, show_img=False)
+            try:
+                traj_est, tstamps = run(scene_path, config, net)
+            except:
+                continue
 
             PERM = [1, 2, 0, 4, 5, 3, 6] # ned -> xyz
-            traj_ref = traj_ref[::STRIDE, PERM]
-
-            traj_est = PoseTrajectory3D(
-                positions_xyz=traj_est[:,:3],
-                orientations_quat_wxyz=traj_est[:, [6, 3, 4, 5]],
-                timestamps=tstamps)
-
-            traj_ref = PoseTrajectory3D(
-                positions_xyz=traj_ref[:,:3],
-                orientations_quat_wxyz=traj_ref[:,3:],
-                timestamps=tstamps)
+            traj_ref = np.loadtxt(traj_ref, delimiter=" ")[::STRIDE, PERM]
 
             # do evaluation
-            ate_score = ate(traj_ref, traj_est)
+            try:
+                ate_score = ate(traj_ref, traj_est, tstamps)
+            except:
+                continue
             all_results.append(ate_score)
             results[scene].append(ate_score)
 
             if plot:
-                scene_name = '_'.join(scene.split('/')[1:]).title() if split == 'validation' else scene
+                scene_name = '_'.join(scene.split('/')[1:]).title()
                 Path("trajectory_plots").mkdir(exist_ok=True)
-                plot_trajectory(traj_est, traj_ref, f"TartanAir {scene_name.replace('_', ' ')} Trial #{j+1} (ATE: {ate_score:.03f})",
+                plot_trajectory((traj_est, tstamps), (traj_ref, tstamps), f"TartanAir {scene_name.replace('_', ' ')} Trial #{j+1} (ATE: {ate_score:.03f})",
                                 f"trajectory_plots/TartanAir_{scene_name}_Trial{j+1:02d}.pdf", align=True, correct_scale=True)
 
             if save:
                 Path("saved_trajectories").mkdir(exist_ok=True)
-                file_interface.write_tum_trajectory_file(f"saved_trajectories/TartanAir_{scene_name}_Trial{j+1:02d}.txt", traj_est)
+                save_trajectory_tum_format((traj_est, tstamps), f"saved_trajectories/TartanAir_{scene_name}_Trial{j+1:02d}.txt")
+           
 
-        data.close()
         print(scene, sorted(results[scene]))
 
     results_dict = dict([("Tartan/{}".format(k), np.median(v)) for (k, v) in results.items()])
 
     # write output to file with timestamp
-    with open(osp.join("TartanAirResults", datetime.datetime.now().strftime('%m-%d-%I%p.txt')), "w") as f:
+    with open(osp.join("TartanAirResults/", save_str), "w") as f:
         f.write(','.join([str(x) for x in all_results]))
-
+    
     xs = []
     for scene in results:
+        if len(results[scene]) == 0:
+            continue
         x = np.median(results[scene])
         xs.append(x)
 
@@ -184,6 +155,7 @@ def evaluate(config, net, split="validation", trials=1, plot=False, save=False):
     results_dict["AUC"] = np.maximum(1 - np.array(ates), 0).mean()
     results_dict["AVG"] = np.mean(xs)
 
+    np.save(osp.join("TartanAirResults/", save_str.replace(".txt", ".npy")), results_dict)
     return results_dict
 
 
@@ -192,48 +164,62 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--viz', action="store_true")
-    parser.add_argument('--show_img', action="store_true")
     parser.add_argument('--id', type=int, default=-1)
     parser.add_argument('--weights', default="dpvo.pth")
     parser.add_argument('--config', default="config/default.yaml")
     parser.add_argument('--split', default="validation")
     parser.add_argument('--trials', type=int, default=1)
-    parser.add_argument('--backend_thresh', type=float, default=18.0)
     parser.add_argument('--plot', action="store_true")
-    parser.add_argument('--opts', nargs='+', default=[])
     parser.add_argument('--save_trajectory', action="store_true")
+    parser.add_argument('--all_ckpts', action="store_true")
+    parser.add_argument('--steps', type=int, default=240000)
     args = parser.parse_args()
 
     cfg.merge_from_file(args.config)
-    cfg.BACKEND_THRESH = args.backend_thresh
-    cfg.merge_from_list(args.opts)
 
     print("Running with config...")
     print(cfg)
 
-    torch.manual_seed(1234)
+    torch.manual_seed(12345)
 
-    if args.id >= 0:
-        scene_path = os.path.join("datasets/mono", test_split[args.id])
-        traj_est, tstamps = run(scene_path, cfg, args.weights, viz=args.viz, show_img=args.show_img)
+    if not args.all_ckpts:
+        ckpt = args.weights
+        save_str = ckpt.split('/')[-1].replace('.pth', f'{args.split}_trials{args.trials}.txt')
+        if args.id >= 0:
+            scene_path = os.path.join("datasets/mono", test_split[args.id])
+            traj_est, tstamps = run(scene_path, cfg, args.weights, viz=args.viz)
 
-        traj_ref = osp.join("datasets/mono", "mono_gt", test_split[args.id] + ".txt")
-        traj_ref = np.loadtxt(traj_ref, delimiter=" ")[::STRIDE,[1, 2, 0, 4, 5, 3, 6]]
+            traj_ref = osp.join("datasets/mono", "mono_gt", test_split[args.id] + ".txt")
+            traj_ref = np.loadtxt(traj_ref, delimiter=" ")[::STRIDE,[1, 2, 0, 4, 5, 3, 6]]
 
-        traj_est = PoseTrajectory3D(
-            positions_xyz=traj_est[:,:3],
-            orientations_quat_wxyz=traj_est[:, [6, 3, 4, 5]],
-            timestamps=tstamps)
+            # do evaluation
+            print(ate(traj_ref, traj_est, tstamps))
 
-        traj_ref = PoseTrajectory3D(
-            positions_xyz=traj_ref[:,:3],
-            orientations_quat_wxyz=traj_ref[:,3:],
-            timestamps=tstamps)
-
-        # do evaluation
-        print(ate(traj_ref, traj_est))
-
+        else:
+            results = evaluate(cfg, args.weights, save_str, split=args.split, trials=args.trials, plot=args.plot, save=args.save_trajectory)
+            for k in results:
+                print(k, results[k])
     else:
-        results = evaluate(cfg, args.weights, split=args.split, trials=args.trials, plot=args.plot, save=args.save_trajectory)
-        for k in results:
-            print(k, results[k])
+        for step in range(0, args.steps, 10000):
+            ckpt = args.weights + '_%06d.pth' % (step + 10000)
+            print(ckpt)
+            if not os.path.isfile(ckpt):
+                ipdb.set_trace()
+            save_str = ckpt.split('/')[-1].replace('.pth', f'{args.split}_trials{args.trials}.txt')
+            if args.id >= 0:
+                scene_path = os.path.join("datasets/mono", test_split[args.id])
+                traj_est, tstamps = run(scene_path, cfg, ckpt, viz=args.viz)
+
+                traj_ref = osp.join("datasets/mono", "mono_gt", test_split[args.id] + ".txt")
+                traj_ref = np.loadtxt(traj_ref, delimiter=" ")[::STRIDE,[1, 2, 0, 4, 5, 3, 6]]
+
+                # do evaluation
+                print(ate(traj_ref, traj_est, tstamps))
+
+            else:
+                for trial in range(args.trials):
+                    save_str = ckpt.split('/')[-1].replace('.pth', f'{args.split}_trials{args.trials}-trial{trial}.txt')
+                    results = evaluate(cfg, ckpt, save_str, split=args.split, trials=1, plot=args.plot, save=args.save_trajectory)
+                    for k in results:
+                        print(k, results[k])
+                    print(save_str)

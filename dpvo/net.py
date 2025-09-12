@@ -18,7 +18,7 @@ from .blocks import GradientClip, GatedResidual, SoftAgg
 from .utils import *
 from .ba import BA
 from . import projective_ops as pops
-
+import ipdb
 autocast = torch.cuda.amp.autocast
 import matplotlib.pyplot as plt
 
@@ -111,16 +111,16 @@ class Patchifier(nn.Module):
         g = F.avg_pool2d(g, 4, 4)
         return g
 
-    def forward(self, images, patches_per_image=80, disps=None, centroid_sel_strat='RANDOM', return_color=False):
+    def forward(self, images, patches_per_image=80, disps=None, gradient_bias=False, return_color=False):
         """ extract patches from input images """
 
         fmap, imap = self.dino_head(images)
-        
+
         b, n, c, h, w = fmap.shape
         P = self.patch_size
 
         # bias patch selection towards regions with high gradient
-        if centroid_sel_strat == 'GRADIENT_BIAS':
+        if gradient_bias:
             g = self.__image_gradient(images)
             x = torch.randint(1, w-1, size=[n, 3*patches_per_image], device="cuda")
             y = torch.randint(1, h-1, size=[n, 3*patches_per_image], device="cuda")
@@ -132,13 +132,10 @@ class Patchifier(nn.Module):
             x = torch.gather(x, 1, ix[:, -patches_per_image:])
             y = torch.gather(y, 1, ix[:, -patches_per_image:])
 
-        elif centroid_sel_strat == 'RANDOM':
+        else:
             x = torch.randint(1, w-1, size=[n, patches_per_image], device="cuda")
             y = torch.randint(1, h-1, size=[n, patches_per_image], device="cuda")
-
-        else:
-            raise NotImplementedError(f"Patch centroid selection not implemented: {centroid_sel_strat}")
-
+        
         coords = torch.stack([x, y], dim=-1).float()
         imap = altcorr.patchify(imap[0], coords, 0).view(b, -1, DIM, 1, 1)
         gmap = altcorr.patchify(fmap[0], coords, P//2).view(b, -1, 128, P, P)
@@ -193,12 +190,10 @@ class VONet(nn.Module):
         )
         self.transform = transforms.Compose([normalize])
 
-
-    # @autocast(enabled=False)
-    def forward(self, images, poses, disps, intrinsics, M=1024, STEPS=12, P=1, structure_only=False, rescale=False):
+    @autocast(enabled=False)
+    def forward(self, images, poses, disps, intrinsics, M=1024, STEPS=12, P=1, structure_only=False, wtd_loss=False, total_steps=0, rescale=False):
         """ Estimates SE3 or Sim3 between pair of frames """
 
-        # images = 2 * (images / 255.0) - 0.5
         images = self.transform(images / 255.0)
         intrinsics = intrinsics / 16.0
         disps = F.interpolate(disps, scale_factor=1/16, mode='bilinear', align_corners=False).float()
@@ -216,7 +211,7 @@ class VONet(nn.Module):
         d = patches[..., 2, p//2, p//2]
         patches = set_depth(patches, torch.rand_like(d))
 
-        kk, jj = flatmeshgrid(torch.where(ix < 8)[0], torch.arange(0,8, device="cuda"), indexing='ij')
+        kk, jj = flatmeshgrid(torch.where(ix < 8)[0], torch.arange(0,8, device="cuda"))
         ii = ix[kk]
 
         imap = imap.view(b, -1, DIM)
@@ -229,7 +224,11 @@ class VONet(nn.Module):
 
         traj = []
         bounds = [-64, -64, w + 64, h + 64]
-        
+        step = 0
+        more_logs = {}
+        logging = torch.zeros((STEPS, 13)).requires_grad_(True)
+        idxs = [net.shape[1]]
+        more_outs = []
         while len(traj) < STEPS:
             Gs = Gs.detach()
             patches = patches.detach()
@@ -237,8 +236,8 @@ class VONet(nn.Module):
             n = ii.max() + 1
             if len(traj) >= 8 and n < images.shape[1]:
                 if not structure_only: Gs.data[:,n] = Gs.data[:,n-1]
-                kk1, jj1 = flatmeshgrid(torch.where(ix  < n)[0], torch.arange(n, n+1, device="cuda"), indexing='ij')
-                kk2, jj2 = flatmeshgrid(torch.where(ix == n)[0], torch.arange(0, n+1, device="cuda"), indexing='ij')
+                kk1, jj1 = flatmeshgrid(torch.where(ix  < n)[0], torch.arange(n, n+1, device="cuda"))
+                kk2, jj2 = flatmeshgrid(torch.where(ix == n)[0], torch.arange(0, n+1, device="cuda"))
 
                 ii = torch.cat([ix[kk1], ix[kk2], ii])
                 jj = torch.cat([jj1, jj2, jj])
@@ -246,6 +245,8 @@ class VONet(nn.Module):
 
                 net1 = torch.zeros(b, len(kk1) + len(kk2), DIM, device="cuda")
                 net = torch.cat([net1, net], dim=1)
+                # unclear if this is the correct split. maybe we should separate kk1 and kk2?
+                idxs.append(net.shape[1])
 
                 if np.random.rand() < 0.1:
                     k = (ii != (n - 4)) & (jj != (n - 4))
@@ -259,26 +260,63 @@ class VONet(nn.Module):
 
             coords = pops.transform(Gs, patches, intrinsics, ii, jj, kk)
             coords1 = coords.permute(0, 1, 4, 2, 3).contiguous()
+            coords_gt, valid, _ = pops.transform(Ps, patches_gt, intrinsics, ii, jj, kk, jacobian=True)
 
+            if step%2==0:
+                more_logs[f"pxgt/px{step}"] = ((coords_gt - coords)[...,p//2,p//2,:] < 1).float().mean().item()
+                more_logs[f"pxgt/px05{step}"] = ((coords_gt - coords)[...,p//2,p//2,:] < 0.5).float().mean().item()
+                more_logs[f"pxgt/px025{step}"] = ((coords_gt - coords)[...,p//2,p//2,:] < 0.25).float().mean().item()
             corr = corr_fn(kk, jj, coords1)
             net, (delta, weight, _) = self.update(net, imap[:,kk], corr, None, ii, jj, kk)
+            weight_net = weight
 
             lmbda = 1e-4
             target = coords[...,p//2,p//2,:] + delta
 
             ep = 10
             for itr in range(2):
-                Gs, patches = BA(Gs, patches, intrinsics, target, weight, lmbda, ii, jj, kk, 
+                Gs, patches = BA(Gs, patches, intrinsics, target, weight_net, lmbda, ii, jj, kk, 
                     bounds, ep=ep, fixedp=1, structure_only=structure_only)
 
             kl = torch.as_tensor(0)
             dij = (ii - jj).abs()
-            k = (dij > 0) & (dij <= 2)
+            if wtd_loss:#True:
+                k = dij < 100
+            else:
+                k = (dij > 0) & (dij <= 2)
 
-            coords = pops.transform(Gs, patches, intrinsics, ii[k], jj[k], kk[k])
-            coords_gt, valid, _ = pops.transform(Ps, patches_gt, intrinsics, ii[k], jj[k], kk[k], jacobian=True)
+            coords = pops.transform(Gs, patches, intrinsics, ii, jj, kk)
+            
+            traj.append((valid[:,k], coords[:,k], coords_gt[:,k], Gs[:,:n], Ps[:,:n], patches[..., 2, p//2, p//2], weight_net[:,k], delta, weight_net, valid, target, coords, coords_gt, net))
+            step+=1
+            more_outs.append([patches, patches_gt, ii, jj, kk, bounds])
+        stats = self.get_stats(traj)
+        stats.update(more_logs)
+        return traj, stats, logging, more_outs
 
-            traj.append((valid, coords, coords_gt, Gs[:,:n], Ps[:,:n], kl))
+    def get_stats(self, traj):
 
-        return traj
+        stats = {}
+        stats['fp_res/pose'] = (traj[-1][3].data[0] - traj[-2][3].data[0]).norm(dim=-1).detach().cpu().numpy().mean()
+        stats['fp_res/flow'] = (traj[-1][-3][0, :, 1, 1,:] - traj[-2][-3][0, :, 1, 1,:]).norm(dim=-1).detach().cpu().numpy().mean()
+        stats['fp_res/wtd_flow'] = (traj[-1][-6]*(traj[-1][-3][0, :, 1, 1,:] - traj[-2][-3][0, :, 1, 1,:])).norm(dim=-1).mean().item()
+        stats['fp_res/wtdnet'] = (traj[-1][-6].norm(dim=-1)[...,None]*(traj[-1][-1] - traj[-2][-1])).norm(dim=-1).detach().cpu().numpy().mean()
+        stats['fp_res/net'] = (traj[-1][-1] - traj[-2][-1]).norm(dim=-1).detach().cpu().numpy().mean()
+        stats['fp_res/depth'] = (traj[-1][5] - traj[-2][5]).norm(dim=-1).detach().cpu().numpy().mean()
+        stats['fp_res/weight'] = (traj[-1][-6] - traj[-2][-6]).norm(dim=-1).detach().cpu().numpy().mean()
 
+
+        stats['avg_wt/avg'] = traj[-1][-6].mean().item()
+        stats['avg_wt/thres02'] = (traj[-1][-6] > 0.2).float().mean().item()
+        stats['avg_wt/thres05'] = (traj[-1][-6] > 0.5).float().mean().item()
+
+        stats['wtfl/err'] = torch.sqrt((traj[-1][-6]*(traj[-1][-2][...,1,1,:] - traj[-1][-3][...,1,1,:])**2).mean(dim=-1)).mean().item()
+        stats['wtfl/flowerr'] = torch.sqrt(((traj[-1][-2][...,1,1,:] - traj[-1][-3][...,1,1,:])**2).mean(dim=-1)).mean().item()
+
+        for i, traji in enumerate(traj):
+            stats[f'delta/del_med{i}'] = traji[7].abs().median().item()
+            stats[f'wt_iters/wt2{i}'] = traji[-6].mean().item()
+            stats[f'fl_iters/fl{i}'] = ((traji[-2][...,1,1,:] - traji[-3][...,1,1,:]).abs()).mean(dim=-1).mean().item()
+            stats[f'fl_iters/wtdfl{i}'] = (traji[-6]*(traji[-2][...,1,1,:] - traji[-3][...,1,1,:]).abs()).mean(dim=-1).mean().item()
+
+        return stats

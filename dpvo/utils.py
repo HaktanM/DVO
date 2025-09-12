@@ -1,11 +1,10 @@
-from contextlib import ContextDecorator
 import torch
 import torch.nn.functional as F
 
 
 all_times = []
 
-class Timer(ContextDecorator):
+class Timer:
     def __init__(self, name, enabled=True):
         self.name = name
         self.enabled = enabled
@@ -26,7 +25,7 @@ class Timer(ContextDecorator):
 
             elapsed = self.start.elapsed_time(self.end)
             all_times.append(elapsed)
-            print(f"{self.name} {elapsed:.03f}")
+            print(self.name, elapsed)
 
 
 def coords_grid(b, n, h, w, **kwargs):

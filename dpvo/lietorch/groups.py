@@ -284,6 +284,11 @@ class SE3(LieGroup):
         t = t * s.unsqueeze(-1)
         return SE3(torch.cat([t, q], dim=-1))
 
+    def normalize_(self):
+        t, q = self.data.split([3,4], -1)
+        q = q / q.norm(dim=-1, keepdim=True)
+        self.data = torch.cat([t, q], dim=-1)
+
 
 class Sim3(LieGroup):
     group_name = 'Sim3'

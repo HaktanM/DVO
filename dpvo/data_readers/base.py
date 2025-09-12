@@ -11,18 +11,19 @@ import random
 import json
 import pickle
 import os.path as osp
+import ipdb
 
 from .augmentation import RGBDAugmentor
 from .rgbd_utils import *
-
 import h5py
 
 class RGBDDataset(data.Dataset):
-    def __init__(self, name, datapath, n_frames=4, crop_size=[480,640], fmin=10.0, fmax=75.0, aug=True, sample=True):
+    def __init__(self, name, datapath, n_frames=4, crop_size=[480,640], fmin=10.0, fmax=75.0, aug=True, sample=True, test=False):
         """ Base class for RGBD dataset """
         self.aug = None
         self.root = datapath
         self.name = name
+        self.test = test
 
         self.aug = aug
         self.sample = sample
@@ -50,13 +51,16 @@ class RGBDDataset(data.Dataset):
     def _build_dataset_index(self):
         self.dataset_index = []
         for scene in self.scene_info:
-            if not self.__class__.is_test_scene(scene):
+            is_test_scene = self.__class__.is_test_scene(scene)
+            accept = (is_test_scene) if self.test else (not is_test_scene)
+            if accept:
                 graph = self.scene_info[scene]['graph']
                 for i in graph:
                     if i < len(graph) - 65:
+                        # ipdb.set_trace()
                         self.dataset_index.append((scene, i))
-            else:
-                print("Reserving {} for validation".format(scene))
+            # else:
+            #     print("Reserving {} for validation".format(scene))
 
     def get_item_from_h5(self, path):
         keywords =  path.split("/")

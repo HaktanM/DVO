@@ -1,33 +1,30 @@
+import cv2
+import numpy as np
 import glob
+import os.path as osp
 import os
-from multiprocessing import Process, Queue
 from pathlib import Path
 
-import cv2
-import evo.main_ape as main_ape
-import numpy as np
+import datetime
+from tqdm import tqdm
+
+from dpvo.utils import Timer
+from dpvo.dpvo import DPVO
+from dpvo.stream import image_stream
+from dpvo.config import cfg
+from dpvo.plot_utils import plot_trajectory, save_trajectory_tum_format
+
 import torch
-from evo.core import sync
-from evo.core.metrics import PoseRelation
+from multiprocessing import Process, Queue
+
+### evo evaluation library ###
+import evo
 from evo.core.trajectory import PoseTrajectory3D
 from evo.tools import file_interface
-
-from dpvo.config import cfg
-from dpvo.dpvo import DPVO
-from dpvo.plot_utils import plot_trajectory
-from dpvo.stream import image_stream
-from dpvo.utils import Timer
-
-
-def write_trajectory(path, seq, traj, times, trial_id):
-    folder_path = os.path.join(path, str(trial_id).zfill(2))
-    if not os.path.exists(folder_path):
-        os.mkdir(folder_path)
-    traj_path = os.path.join(folder_path, seq + ".txt")
-    with open(traj_path, 'w') as file:
-        for idx in range(len(times)):
-            file.write(f"{times[idx]:.5f}, {traj[idx,0]:.3f}, {traj[idx,1]:.3f}, {traj[idx,2]:.3f}, {traj[idx,3]:.5f}, {traj[idx,4]:.5f}, {traj[idx,5]:.5f}, {traj[idx,6]:.5f}\n")
-
+from evo.core import sync
+import evo.main_ape as main_ape
+from evo.core.metrics import PoseRelation
+import ipdb
 
 SKIP = 0
 
@@ -37,7 +34,7 @@ def show_image(image, t=0):
     cv2.waitKey(t)
 
 @torch.no_grad()
-def run(cfg, network, imagedir, calib, stride=1, viz=False, show_img=False):
+def run(cfg, network, imagedir, calib, stride=1, viz=False):
 
     slam = None
 
@@ -49,24 +46,78 @@ def run(cfg, network, imagedir, calib, stride=1, viz=False, show_img=False):
         (t, image, intrinsics) = queue.get()
         if t < 0: break
 
-        cv2.imshow("image", image)
-        cv2.waitKey(1)
-
         image = torch.from_numpy(image).permute(2,0,1).cuda()
         intrinsics = torch.from_numpy(intrinsics).cuda()
 
-        if show_img:
+        if viz: 
             show_image(image, 1)
 
         if slam is None:
             slam = DPVO(cfg, network, ht=image.shape[1], wd=image.shape[2], viz=viz)
 
+        image = image.cuda()
+        intrinsics = intrinsics.cuda()
+
         with Timer("SLAM", enabled=False):
             slam(t, image, intrinsics)
+
+    for _ in range(12):
+        slam.update()
 
     reader.join()
 
     return slam.terminate()
+
+def evaluate_euroc(euroc_scenes, cfg, ckpt, args):
+    results = {}
+    for scene in euroc_scenes:
+        imagedir = os.path.join(args.eurocdir, scene, "mav0/cam0/data")
+        groundtruth = "datasets/euroc_groundtruth/{}.txt".format(scene) 
+        if scene in results:
+            print(results[scene])
+            continue
+        scene_results = []
+        for i in range(args.trials):
+            traj_est, timestamps = run(cfg, ckpt, imagedir, "calib/euroc.txt", args.stride, args.viz)
+
+            images_list = sorted(glob.glob(os.path.join(imagedir, "*.png")))[::args.stride]
+            tstamps = [float(x.split('/')[-1][:-4]) for x in images_list]
+
+            traj_est = PoseTrajectory3D(
+                positions_xyz=traj_est[:,:3],
+                orientations_quat_wxyz=traj_est[:,3:],
+                timestamps=np.array(tstamps))
+
+            traj_ref = file_interface.read_tum_trajectory_file(groundtruth)
+            traj_ref, traj_est = sync.associate_trajectories(traj_ref, traj_est)
+            try:
+                result = main_ape.ape(traj_ref, traj_est, est_name='traj', 
+                    pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
+                ate_score = result.stats["rmse"]
+            except:
+                continue
+
+            if args.plot:
+                scene_name = '_'.join(scene.split('/')[1:]).title()
+                Path("trajectory_plots").mkdir(exist_ok=True)
+                plot_trajectory(traj_est, traj_ref, f"Euroc {scene} Trial #{i+1} (ATE: {ate_score:.03f})",
+                                f"trajectory_plots/Euroc_{scene}_Trial{i+1:02d}.pdf", align=True, correct_scale=True)
+
+            if args.save_trajectory:
+                Path("saved_trajectories").mkdir(exist_ok=True)
+                save_trajectory_tum_format(traj_est, f"saved_trajectories/Euroc_{scene}_Trial{i+1:02d}.txt")
+
+            scene_results.append(ate_score)
+
+        results[scene] = np.median(scene_results)
+        print(scene, sorted(scene_results))
+    xs = []
+    for scene in results:
+        print(scene, results[scene])
+        xs.append(results[scene])
+
+    print("AVG: ", np.mean(xs))
+    return results
 
 
 if __name__ == '__main__':
@@ -76,18 +127,13 @@ if __name__ == '__main__':
     parser.add_argument('--config', default="config/default.yaml")
     parser.add_argument('--stride', type=int, default=2)
     parser.add_argument('--viz', action="store_true")
-    parser.add_argument('--show_img', action="store_true")
-    parser.add_argument('--trials', type=int, default=9)
-    parser.add_argument('--eurocdir', default="/media/haktanito/HDD/EuroC")
-    parser.add_argument('--backend_thresh', type=float, default=64.0)
+    parser.add_argument('--trials', type=int, default=1)
+    parser.add_argument('--eurocdir', default="../../deq-dpvo/datasets/euroc")
     parser.add_argument('--plot', action="store_true")
-    parser.add_argument('--opts', nargs='+', default=[])
     parser.add_argument('--save_trajectory', action="store_true")
     args = parser.parse_args()
 
     cfg.merge_from_file(args.config)
-    cfg.BACKEND_THRESH = args.backend_thresh
-    cfg.merge_from_list(args.opts)
 
     print("\nRunning with config...")
     print(cfg, "\n")
@@ -108,57 +154,11 @@ if __name__ == '__main__':
         "V2_03_difficult",
     ]
 
-    results = {}
-    for scene in euroc_scenes:
-        imagedir = os.path.join(args.eurocdir, scene, "mav0/cam0/data")
-        groundtruth = "datasets/euroc_groundtruth/{}.txt".format(scene) 
-
-        scene_results = []
-        start_idx = 1 
-        for i in range(start_idx,args.trials+start_idx):
-            traj_est, timestamps = run(cfg, args.network, imagedir, "calib/euroc.txt", args.stride, args.viz, args.show_img)
-
-            
-            images_list = sorted(glob.glob(os.path.join(imagedir, "*.png")))[::args.stride]
-            tstamps = [float(x.split('/')[-1][:-4]) for x in images_list]
-
-            # Save the estimated trajectory for further analysis
-            write_trajectory(path='EstimatedTrajectories/OriginalDPVO', seq=scene, traj=traj_est, times=tstamps, trial_id=i)
-
-            traj_est = PoseTrajectory3D(
-                positions_xyz=traj_est[:,:3],
-                orientations_quat_wxyz=traj_est[:, [6, 3, 4, 5]],
-                timestamps=np.array(tstamps))
-
-            traj_ref = file_interface.read_tum_trajectory_file(groundtruth)
-            traj_ref, traj_est = sync.associate_trajectories(traj_ref, traj_est)
-
-            result = main_ape.ape(traj_ref, traj_est, est_name='traj', 
-                pose_relation=PoseRelation.translation_part, align=True, correct_scale=True)
-            ate_score = result.stats["rmse"]
-
-            if args.plot:
-                scene_name = '_'.join(scene.split('/')[1:]).title()
-                Path("trajectory_plots").mkdir(exist_ok=True)
-                plot_trajectory(traj_est, traj_ref, f"Euroc {scene} Trial #{i+1} (ATE: {ate_score:.03f})",
-                                f"trajectory_plots/Euroc_{scene}_Trial{i+1:02d}.pdf", align=True, correct_scale=True)
-
-            if args.save_trajectory:
-                Path("saved_trajectories").mkdir(exist_ok=True)
-                file_interface.write_tum_trajectory_file(f"saved_trajectories/Euroc_{scene}_Trial{i+1:02d}.txt", traj_est)
-
-            scene_results.append(ate_score)
-
-        results[scene] = np.median(scene_results)
-        print(scene, sorted(scene_results))
-
-    xs = []
-    for scene in results:
-        print(scene, results[scene])
-        xs.append(results[scene])
-
-    print("AVG: ", np.mean(xs))
-
+    ckpt = args.network
+    save_str = ckpt.split('/')[-1].replace('.pth', f'euroc_trials{args.trials}.txt')
+    results = evaluate_euroc(euroc_scenes, cfg, ckpt, args)
+    np.save('euroc_results/' + save_str, results)
+        
     
 
     
