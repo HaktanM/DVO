@@ -74,7 +74,7 @@ def train(args):
     db = dataset_factory(['tartan'], datapath="/project_data/datasets/TartanAir", n_frames=args.n_frames, test=args.test)
     train_loader = DataLoader(db, batch_size=1, shuffle=True, num_workers=4)
 
-    net = VONet()
+    net = VONet(args)
     net.train()
     net.cuda()
     torch.set_printoptions(precision=6, threshold=1000, linewidth=160, sci_mode=False)
@@ -280,7 +280,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name', default='bla', help='name your experiment')
+    parser.add_argument('--name', default='DVO-VV', help='name your experiment')
     parser.add_argument('--ckpt', help='checkpoint to restore')
     parser.add_argument('--steps', type=int, default=240000)
     parser.add_argument('--lr', type=float, default=0.00008)
@@ -296,6 +296,15 @@ if __name__ == '__main__':
     parser.add_argument('--all_flows_loss', action='store_false')
     parser.add_argument('--so_flag', action='store_true')
     parser.add_argument('--wtd_obj', action='store_true')
+
+    ## Patch size and radius of correlation window
+    parser.add_argument('--P', type=int, default=3)
+    parser.add_argument('--R', type=int, default=3)
+
+    ## Dino related arguments
+    parser.add_argument('--DINE_MODEL', type=str, default="dinov3_vits16plus")
+    parser.add_argument('--PATH_DINO_WEIGHTS', type=str, default=f"dinov3/weights/dinov3_vits16plus.pth")
+    parser.add_argument('--ENCODER_LAYERS', type=list, default=[0, 3, 5])
     args = parser.parse_args()
 
     train(args)
