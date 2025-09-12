@@ -4,162 +4,138 @@
 # the terms of the DINOv3 License Agreement.
 
 import torch
+from torch import nn
 from ..utils import cast_to
 
 from .dpt_head import DPTHead
 from .encoder import BackboneLayersSet, DinoVisionTransformerWrapper, PatchSizeAdaptationStrategy
+import copy
+from .cnn_extractor import BasicEncoder4
 
-
-class FeaturesToDepth(torch.nn.Module):
-    def __init__(
-        self,
-        min_depth=0.001,
-        max_depth=80,
-        bins_strategy="linear",
-        norm_strategy="linear",
-    ):
-        """
-        Module which converts a feature maps into a depth map
-
-        Args:
-        min_depth (float): minimum depth, used to calibrate the depth range
-        max_depth (float): maximum depth, used to calibrate the depth range
-        bins_strategy (str): Choices are 'linear' or 'log', for Uniform or Scale Invariant distributions for depth bins.
-                             See AdaBins [1] for more details.
-        norm_strategy (str): Choices are 'linear', 'softmax' or 'sigmoid', for the conversion of features to depth logits
-        scale_up (bool): If true, and only if regression by classification is not used, the result is multiplied by max_depth
-
-
-        Example:
-        x = depth_model(input_image)  # N C H W
-        - If pure regression (C == 1), depth is obtained by scaling and/or shifting x
-        - If C > 1, bins are used:
-            Depth is obtained as a weighted sum of depth bins, where weights are predicted logits. (see AdaBins [1] for more details)
-
-        [1] AdaBins: https://github.com/shariqfarooq123/AdaBins
-        """
-        super().__init__()
-        self.min_depth = min_depth
-        self.max_depth = max_depth
-        assert bins_strategy in ["linear", "log"], "Support bins_strategy: linear, log"
-        assert norm_strategy in ["linear", "softmax", "sigmoid"], "Support norm_strategy: linear, softmax, sigmoid"
-
-        self.bins_strategy = bins_strategy
-        self.norm_strategy = norm_strategy
-
-    def forward(self, x):
-        n_bins = x.shape[1]  # N n_bins H W
-        if n_bins > 1:
-            if self.bins_strategy == "linear":
-                bins = torch.linspace(self.min_depth, self.max_depth, n_bins, device=x.device)
-            elif self.bins_strategy == "log":
-                bins = torch.linspace(
-                    torch.log(torch.tensor(self.min_depth)),
-                    torch.log(torch.tensor(self.max_depth)),
-                    n_bins,
-                    device=x.device,
-                )
-                bins = torch.exp(bins)
-
-            # following Adabins, default linear
-            if self.norm_strategy == "linear":
-                logit = torch.relu(x)
-                eps = 0.1
-                logit = logit + eps
-                logit = logit / logit.sum(dim=1, keepdim=True)
-            elif self.norm_strategy == "softmax":
-                logit = torch.softmax(x, dim=1)
-            elif self.norm_strategy == "sigmoid":
-                logit = torch.sigmoid(x)
-                logit = logit / logit.sum(dim=1, keepdim=True)
-
-            output = torch.einsum("ikmn,k->imn", [logit, bins]).unsqueeze(dim=1)
-        else:
-            # standard regression
-            output = torch.relu(x) + self.min_depth
-        return output
 
 
 def make_head(
     embed_dims: int | list[int],
     use_batchnorm: bool = False,
     use_cls_token: bool = False,
-    # upsample: int = 4,
-    head_type: str = "linear",
+    channels=512,
+    convmodule_norm_cfg=None,
     **kwargs,
 ) -> torch.nn.Module:
 
     if isinstance(embed_dims, int):
         embed_dims = [embed_dims]
 
-    if head_type == "linear":
-        raise NotImplementedError
-    elif head_type == "dpt":
-        decoder = DPTHead(
-            in_channels=embed_dims,
-            readout_type="project" if use_cls_token else "ignore",
-            use_batchnorm=use_batchnorm,
-            **kwargs,  # TODO add here post_process_channels, n_hidden_channels
-        )
-    else:
-        raise NotImplementedError("only linear and DPT head supported")
+    decoder = DPTHead(
+        in_channels=embed_dims,
+        readout_type="project" if use_cls_token else "ignore",
+        use_batchnorm=use_batchnorm,
+        channels=channels,
+        convmodule_norm_cfg=convmodule_norm_cfg,
+        **kwargs,  # TODO add here post_process_channels, n_hidden_channels
+    )
+
     return decoder
 
+class Fusion(torch.nn.Module):
+    def __init__(self,
+                 dim1: int,
+                 dim2: int,
+                 out_dim: int,
+                 norm_fn: str):
+        super().__init__()
+        
 
-class EncoderDecoder(torch.nn.Module):
+        if norm_fn == 'instance':
+            # Create two independent norm layers for use in the sequence
+            norm1 = nn.InstanceNorm2d(out_dim)
+            norm2 = nn.InstanceNorm2d(out_dim)
+        elif norm_fn == 'none':
+            norm1 = nn.Identity()
+            norm2 = nn.Identity()
+        else:
+            raise ValueError(f"Unknown norm_fn: {norm_fn}")
+
+        self.net = nn.Sequential(
+            nn.Conv2d(dim1 + dim2, out_dim, kernel_size=1, stride=1, bias=False),
+            norm1,
+            nn.ReLU(),
+            nn.Conv2d(out_dim, out_dim, kernel_size=3, padding=1, stride=1, bias=False),
+            norm2,
+            nn.ReLU(),
+            nn.Conv2d(out_dim, out_dim, kernel_size=3, padding=1, stride=1, bias=False)
+        )
+
+    def forward(self, x1, x2):
+        x = torch.cat((x1, x2), 1)
+        return self.net(x)
+            
+        
+    
+
+class EncoderDecoderFusion(torch.nn.Module):
     def __init__(
         self,
         encoder: torch.nn.Module,
-        decoder: torch.nn.Module,
+        fdecoder: torch.nn.Module,
+        idecoder: torch.nn.Module,
+        fnet_cnn: torch.nn.Module,
+        inet_cnn: torch.nn.Module,
+        f_fusion: torch.nn.Module,
+        i_fusion: torch.nn.Module,
         encoder_dtype=torch.float,
         decoder_dtype=torch.float,
     ):
         super().__init__()
         self.encoder = encoder
-        self.decoder = decoder
+        self.fdecoder = fdecoder
+        self.idecoder = idecoder
+        self.fnet_cnn = fnet_cnn
+        self.inet_cnn = inet_cnn
+        self.f_fusion = f_fusion
+        self.i_fusion = i_fusion
         self.encoder_dtype = encoder_dtype
         self.decoder_dtype = decoder_dtype
+
         self.is_cuda = torch.cuda.is_available()
-        # for name, param in self.encoder.named_parameters():
-        #     if "blocks.11" in name or "blocks.10" in name or "blocks.9" in name:
-        #         param.requires_grad = True
-        #     if "backbone.norm" in name:
-        #         param.requires_grad = True
-                # print(name, param.requires_grad)
+
         for param in self.encoder.parameters():
             param.requires_grad = False
-        # for param in self.decoder.parameters():
-        #     param.requires_grad = True
-        pass
+
 
     def forward(self, x):
         self.encoder.eval()
-        if len(x.shape) > 4:
-            prefix_shape = x.shape[:-3]
-            x = x.reshape(-1, *x.shape[-3:])
-            x = x.to(self.encoder_dtype)
-            with torch.no_grad():
-                x = self.encoder(x)
-            x = cast_to(x, self.decoder_dtype)
-            x = self.decoder(x)
-            x = x.reshape(*prefix_shape, *x.shape[-3:])
-        else:
-            x = x.to(self.encoder_dtype)
-            with torch.no_grad():
-                x = self.encoder(x)
-            x = cast_to(x, self.decoder_dtype)
-            x = self.decoder(x)
-        return x
+
+        prefix_shape = x.shape[:-3]
+        x = x.reshape(-1, *x.shape[-3:])
+        x = x.to(self.encoder_dtype)
+        # f_cnn = self.fnet_cnn(x)
+        # i_cnn = self.inet_cnn(x)
+        with torch.no_grad():
+            x = self.encoder(x)
+        x = cast_to(x, self.decoder_dtype)
+        # f_cnn = cast_to(f_cnn, self.decoder_dtype)
+        # i_cnn = cast_to(i_cnn, self.decoder_dtype)
+        f_dpt = self.fdecoder(x)
+        # i_dpt = self.idecoder(x)
+        f_x = self.f_fusion(f_dpt, f_dpt)
+        # i_x = self.i_fusion(i_dpt, i_cnn)
+        
+        f_x = f_x.reshape(*prefix_shape, *f_x.shape[-3:])
+        # i_x = i_x.reshape(*prefix_shape, *i_x.shape[-3:])
+
+        return f_x# , i_x
 
 
 def build_head(
     backbone: torch.nn.Module,
+    f_dim: int,
+    i_dim: int,
     backbone_out_layers: list[int] | BackboneLayersSet,
     use_backbone_norm: bool = False,
     use_batchnorm: bool = False,
     use_cls_token: bool = False,
     adapt_to_patch_size: PatchSizeAdaptationStrategy = PatchSizeAdaptationStrategy.CENTER_PADDING,
-    head_type: str = "dpt",
     encoder_dtype: torch.dtype = torch.float,
     decoder_dtype: torch.dtype = torch.float,
     # depth args
@@ -172,27 +148,43 @@ def build_head(
         adapt_to_patch_size=adapt_to_patch_size,
     )
     encoder = encoder.to(encoder_dtype)
-    # encoder.eval()
 
-    decoder = make_head(
+
+    fdecoder = make_head(
         encoder.embed_dims,
         use_batchnorm=use_batchnorm,
         use_cls_token=use_cls_token,
-        head_type=head_type,
+        channels=f_dim,
+        convmodule_norm_cfg={"type":"instance"},
         **kwargs,
     )
-    # decoder.eval()
-
-    # features_to_depth = torch.nn.Identity()
-    # FeaturesToDepth(
-    #     min_depth=min_depth,
-    #     max_depth=max_depth,
-    #     bins_strategy=bins_strategy,
-    #     norm_strategy=norm_strategy,
+    
+    # idecoder = make_head(
+    #     encoder.embed_dims,
+    #     use_batchnorm=use_batchnorm,
+    #     use_cls_token=use_cls_token,
+    #     channels=i_dim,
+    #     convmodule_norm_cfg=None,
+    #     **kwargs,
     # )
-    encoder_decoder = EncoderDecoder(
-            encoder,
-            decoder,
+    
+    # fnet_cnn = BasicEncoder4(output_dim=f_dim, norm_fn='instance')
+    # inet_cnn = BasicEncoder4(output_dim=i_dim, norm_fn='none')
+    # fnet_cnn = fnet_cnn.to(encoder_dtype)
+    # inet_cnn = inet_cnn.to(encoder_dtype)
+    # encoder.eval()
+    
+    f_fusion = Fusion(f_dim,f_dim,f_dim,norm_fn="instance")
+    # i_fusion = Fusion(i_dim,i_dim,i_dim,norm_fn="none")
+
+    encoder_decoder = EncoderDecoderFusion(
+            encoder=encoder,
+            fdecoder=fdecoder,
+            idecoder=None,
+            fnet_cnn=None,
+            inet_cnn=None,
+            f_fusion=f_fusion,
+            i_fusion=None,
             encoder_dtype=encoder_dtype,
             decoder_dtype=decoder_dtype,
         )

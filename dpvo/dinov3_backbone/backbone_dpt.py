@@ -85,7 +85,8 @@ def make_dinov3_head(
     pretrained: bool = True,
     backbone_weights: BackboneWeights | str = BackboneWeights.LVD1689M,
     backbone_dtype: torch.dtype = torch.float32,
-    channels=512,
+    f_dim=128,
+    i_dim=384,
     use_backbone_norm=True,
     use_batchnorm=False,
     use_cls_token=False,
@@ -100,31 +101,20 @@ def make_dinov3_head(
     out_index = _get_out_layers(backbone_name)
     post_process_channels = _get_post_process_channels(backbone_name)
 
-    depther = build_head(
+    model = build_head(
         backbone,
+        f_dim=f_dim,
+        i_dim=i_dim,
         backbone_out_layers=out_index,
         use_backbone_norm=use_backbone_norm,
         use_batchnorm=use_batchnorm,
         use_cls_token=use_cls_token,
-        head_type="dpt",
         encoder_dtype=backbone_dtype,
-        # DPTHead args
-        channels=channels,
         post_process_channels=post_process_channels,
         **kwargs,
     )
 
-    # if pretrained:
-    #     if isinstance(depther_weights, DepthWeights):
-    #         assert depther_weights == DepthWeights.SYNTHMIX, f"Unsupported depther weights {depther_weights}"
-    #         weights_name = depther_weights.value.lower()
-    #         hash = kwargs["hash"] if "hash" in kwargs else "02040be1"
-    #         url = DINOV3_BASE_URL + f"/{backbone_name}/{backbone_name}_{weights_name}_dpt_head-{hash}.pth"
-    #     else:
-    #         url = convert_path_or_url_to_url(depther_weights)
-    #     checkpoint = torch.hub.load_state_dict_from_url(url, map_location="cpu", check_hash=check_hash)
-    #     depther[0].decoder.load_state_dict(checkpoint, strict=True)
-    return depther
+    return model
 
 
 

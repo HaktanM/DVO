@@ -101,8 +101,13 @@ class Patchifier(nn.Module):
         self.patch_size = patch_size
         # self.fnet = BasicEncoder4(output_dim=128, norm_fn='instance')
         # self.inet = BasicEncoder4(output_dim=DIM, norm_fn='none')
+        # self.dino_dpt = make_dinov3_head(backbone_name="dinov3_vitb16",
+        #                                  channels=DIM+128,
+        #                                 pretrained=True,
+        #                                 backbone_weights="dinov3/weights/dinov3_vitb16.pth")
         self.dino_dpt = make_dinov3_head(backbone_name="dinov3_vitb16",
-                                         channels=DIM+128,
+                                         f_dim=128+DIM,
+                                         i_dim=None,
                                         pretrained=True,
                                         backbone_weights="dinov3/weights/dinov3_vitb16.pth")
 

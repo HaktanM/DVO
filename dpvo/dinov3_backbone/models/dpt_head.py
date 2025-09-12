@@ -157,22 +157,15 @@ class ConvModule(nn.Module):
 
         # # build normalization layers
         if self.with_norm:
-            # norm layer is after conv layer
-            if order.index("norm") > order.index("conv"):
-                norm_channels = out_channels
+            if norm_cfg["type"] == "instance":
+                self.norm = nn.InstanceNorm2d(out_channels)
+            elif norm_cfg["type"] == "batch":
+                self.norm = nn.BatchNorm2d(out_channels)
+                self.norm_name
             else:
-                norm_channels = in_channels
-            # self.norm_name, norm = build_norm_layer(
-            #     norm_cfg, norm_channels)  # type: ignore
-            self.add_module("bn", torch.nn.SyncBatchNorm(norm_channels))
-            # if self.with_bias:
-            #     if isinstance(norm, (_BatchNorm, _InstanceNorm)):
-            #         warnings.warn(
-            #             'Unnecessary conv bias before batch/instance norm')
-            self.norm_name = "bn"
+                raise NotImplementedError(f" normalization is not implemented")
         else:
             self.norm_name = None  # type: ignore
-        self.instance_norm = nn.InstanceNorm2d(out_channels)
 
         # build activation layer
         if self.with_activation:
@@ -185,12 +178,7 @@ class ConvModule(nn.Module):
         # Use msra init by default
         self.init_weights()
 
-    @property
-    def norm(self):
-        if self.norm_name:
-            return getattr(self, self.norm_name)
-        else:
-            return None
+
 
     def init_weights(self):
         # 1. It is mainly for customized conv layers with their own
@@ -211,7 +199,7 @@ class ConvModule(nn.Module):
                 a = 0
             kaiming_init(self.conv, a=a, nonlinearity=nonlinearity)
         if self.with_norm:
-            constant_init(self.norm_name, 1, bias=0)
+            constant_init(self.norm, 1, bias=0)
 
     def forward(self, x: torch.Tensor, activate: bool = True, norm: bool = True, debug: bool = False) -> torch.Tensor:
         for layer in self.order:
@@ -221,8 +209,8 @@ class ConvModule(nn.Module):
                 if self.with_explicit_padding:
                     x = self.padding_layer(x)
                 x = self.conv(x)
-            elif layer == "norm": # and norm and self.with_norm:
-                x = self.instance_norm(x)
+            elif layer == "norm" and norm and self.with_norm:
+                x = self.norm(x)
             elif layer == "act" and activate and self.with_activation:
                 x = self.activate(x)
         return x
@@ -294,6 +282,7 @@ class ReassembleBlocks(nn.Module):
         out_channels=[128, 256, 512, 1024],
         readout_type="project",
         use_batchnorm=False,
+        norm_cfg=None
     ):
         super(ReassembleBlocks, self).__init__()
 
@@ -307,6 +296,7 @@ class ReassembleBlocks(nn.Module):
                     out_channels=out_channel,
                     kernel_size=1,
                     act_cfg=None,
+                    norm_cfg=norm_cfg
                 )
                 for channel_index, out_channel in enumerate(out_channels)
             ]
@@ -471,18 +461,20 @@ class DPTHead(nn.Module):
         readout_type="project",
         expand_channels=False,
         use_batchnorm=False,  # TODO
+        convmodule_norm_cfg = None,
         **kwargs,
     ):
         super(DPTHead, self).__init__(**kwargs)
         self.channels = channels
         self.in_channels = in_channels
         self.expand_channels = expand_channels
-        self.norm_cfg = None  # TODO CHECK THIS
+        self.norm_cfg = convmodule_norm_cfg
         self.reassemble_blocks = ReassembleBlocks(
             in_channels=in_channels,
             out_channels=post_process_channels,
             readout_type=readout_type,
             use_batchnorm=use_batchnorm,
+            norm_cfg=self.norm_cfg
         )
 
         self.post_process_channels = [
@@ -490,7 +482,7 @@ class DPTHead(nn.Module):
         ]
         self.convs = nn.ModuleList()
         for channel in self.post_process_channels:
-            self.convs.append(ConvModule(channel, self.channels, kernel_size=3, padding=1, act_cfg=None, bias=False))
+            self.convs.append(ConvModule(channel, self.channels, kernel_size=3, padding=1, act_cfg=None, norm_cfg=self.norm_cfg, bias=False))
         self.fusion_blocks = nn.ModuleList()
         self.act_cfg = {"type": "ReLU"}
         for _ in range(len(self.convs)):
