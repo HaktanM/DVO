@@ -50,7 +50,7 @@ def train(args):
     db = dataset_factory(['tartan'], datapath=args.h5_path, n_frames=args.n_frames)
     train_loader = DataLoader(db, batch_size=1, shuffle=True, num_workers=4)
 
-    net = VONet()
+    net = VONet(args)
     net.train()
     net.cuda()
 
@@ -148,9 +148,10 @@ def train(args):
                     PATH = 'checkpoints/%s_%06d.pth' % (args.name, total_steps)
                     torch.save(net.state_dict(), PATH)
 
-                validation_results = validate(None, net)
-                if rank == 0:
-                    logger.write_dict(validation_results)
+                # Validation will be caried out on EuroC sequence
+                # validation_results = validate(None, net)
+                # if rank == 0:
+                #     logger.write_dict(validation_results)
 
                 torch.cuda.empty_cache()
                 net.train()
@@ -158,7 +159,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name',    default='/DinoVO', help='name your experiment')
+    parser.add_argument('--name',    default='/DVO_baseline', help='name your experiment')
     parser.add_argument('--ckpt',    help='checkpoint to restore')
     parser.add_argument('--h5_path', default="/data", help='path to h5 files')
     parser.add_argument('--steps', type=int, default=240000)
@@ -167,6 +168,15 @@ if __name__ == '__main__':
     parser.add_argument('--n_frames', type=int, default=15)
     parser.add_argument('--pose_weight', type=float, default=10.0)
     parser.add_argument('--flow_weight', type=float, default=0.1)
+
+    ## Patch size and radius of correlation window
+    parser.add_argument('--P', type=int, default=1)
+    parser.add_argument('--R', type=int, default=1)
+
+    ## Dino related arguments
+    parser.add_argument('--DINE_MODEL', type=str, default="dinov3_vits16plus")
+    parser.add_argument('--PATH_DINO_WEIGHTS', type=float, default=f"dinov3/weights/dinov3_vits16plus_pretrain_lvd1689m-4057cbaa.pth")
+    parser.add_argument('--ENCODER_LAYERS', type=list, default=[0, 3, 5])
     args = parser.parse_args()
 
     train(args)

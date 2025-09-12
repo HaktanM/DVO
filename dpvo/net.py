@@ -22,13 +22,13 @@ from . import projective_ops as pops
 autocast = torch.cuda.amp.autocast
 import matplotlib.pyplot as plt
 
-from .dinov3_backbone import make_dinov3_head
+from dpvo.dinov3_backbone.DinoHead import getDinoHead
 from torchvision import transforms
 
 DIM = 384
 
 class Update(nn.Module):
-    def __init__(self, p):
+    def __init__(self, cfg):
         super(Update, self).__init__()
 
         self.c1 = nn.Sequential(
@@ -54,7 +54,7 @@ class Update(nn.Module):
         )
 
         self.corr = nn.Sequential(
-            nn.Linear(2*49*p*p, DIM),
+            nn.Linear(2*(2*cfg.R+1)*cfg.P*cfg.P, DIM),
             nn.ReLU(inplace=True),
             nn.Linear(DIM, DIM),
             nn.LayerNorm(DIM, eps=1e-3),
@@ -96,15 +96,11 @@ class Update(nn.Module):
 
 
 class Patchifier(nn.Module):
-    def __init__(self, patch_size=3):
+    def __init__(self, cfg):
         super(Patchifier, self).__init__()
-        self.patch_size = patch_size
-        # self.fnet = BasicEncoder4(output_dim=128, norm_fn='instance')
-        # self.inet = BasicEncoder4(output_dim=DIM, norm_fn='none')
-        self.dino_dpt = make_dinov3_head(backbone_name="dinov3_vitb16",
-                                         channels=DIM+128,
-                                        pretrained=True,
-                                        backbone_weights="dinov3/weights/dinov3_vitb16.pth")
+        self.patch_size = cfg.P
+        
+        self.dino_head = getDinoHead(cfg)
 
     def __image_gradient(self, images):
         gray = ((images + 0.5) * (255.0 / 2)).sum(dim=2)
@@ -185,11 +181,11 @@ class CorrBlock:
 
 
 class VONet(nn.Module):
-    def __init__(self, use_viewer=False):
+    def __init__(self, cfg, use_viewer=False):
         super(VONet, self).__init__()
         self.P = 3
-        self.patchify = Patchifier(self.P)
-        self.update = Update(self.P)
+        self.patchify = Patchifier(cfg)
+        self.update = Update(cfg)
 
         self.DIM = DIM
         self.RES = 4

@@ -80,16 +80,6 @@ class DinoVisionTransformerWrapper(nn.Module):
             ),
         )
 
-        # If the backbone does not define embed_dims, use [embed_dim] * n_blocks
-        try:
-            embed_dims = self.backbone.embed_dims
-        except AttributeError:
-            embed_dim = self.backbone.embed_dim
-            n_blocks = self.backbone.n_blocks
-            logger.warning(f"Backbone does not define embed_dims, using {[embed_dim] * n_blocks=} instead")
-            embed_dims = [embed_dim] * n_blocks
-        self.embed_dims: Sequence[int] = [embed_dims[idx] for idx in self.backbone_out_indices]
-
         # How to adapt input images to the patch size of the model?
         try:
             input_pad_size = self.backbone.input_pad_size
