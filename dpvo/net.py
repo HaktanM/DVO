@@ -112,12 +112,8 @@ class Patchifier(nn.Module):
 
     def forward(self, images, patches_per_image=80, disps=None, centroid_sel_strat='RANDOM', return_color=False):
         """ extract patches from input images """
-        # fmap = self.fnet(images) / 4.0
-        # imap = self.inet(images) / 4.0
 
-        embed = self.dino_dpt(images)
-        imap = embed[:,:,:DIM] / 4.0
-        fmap = embed[:,:,DIM:] / 4.0
+        fmap, imap = self.dino_head(images)
         
         b, n, c, h, w = fmap.shape
         P = self.patch_size
