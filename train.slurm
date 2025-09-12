@@ -4,7 +4,7 @@
 #SBATCH --output=/arf/scratch/hyalcin/slurm_outs/%A.out
 #SBATCH --error=/arf/scratch/hyalcin/slurm_outs/%A.err
 #SBATCH --time=3-00:00:00
-#SBATCH --job-name=DVObase
+#SBATCH --job-name=DVO-VV
 
 #SBATCH --partition=kolyoz-cuda
 #SBATCH --nodes=1
@@ -17,14 +17,14 @@ export EVO_ASSETS_PATH=/data
 
 apptainer exec --nv --no-home \
     --bind /arf/scratch/hyalcin/datasets/h5:/data \
-    --bind /arf/scratch/hyalcin/DVO:/DVO \
+    --bind /arf/scratch/hyalcin/DVO-VV/DVO:/DVO \
     /arf/scratch/hyalcin/container \
     bash -c '
-        source /env/bin/activate && \
+        source /envVV/bin/activate && \
         cd /DVO && \
         export EVO_ASSETS_PATH=/data && \
         export HOME=/DVO && \
-        python3 train_h5.py --name DVO-Baseline
+        python3 train.py --name DVO-VV
     '
 exit
 

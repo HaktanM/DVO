@@ -16,15 +16,15 @@
 
 apptainer exec --writable --fakeroot --no-home  \
     --bind /arf/scratch/hyalcin/datasets/h5:/data \
-    --bind /arf/scratch/hyalcin/DVO:/DVO \
+    --bind /arf/scratch/hyalcin/DVO-VV/DVO:/DVO \
     /arf/scratch/hyalcin/container \
     bash -c "
         export TORCH_CUDA_ARCH_LIST=9.0
-        source /env/bin/activate && \
+        source /envVV/bin/activate && \
         cd /DVO && 
-        pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu126 --no-cache && \
-        pip install torch_scatter -f https://pytorch-geometric.com/whl/torch-2.7.0+cu126.html --no-cache && \
-        pip install -r requirements.txt --no-build-isolation --no-cache && \
+        pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https://download.pytorch.org/whl/cu126&& \
+        pip install torch_scatter -f https://pytorch-geometric.com/whl/torch-2.7.0+cu126.html&& \
+        pip install -r requirements.txt --no-build-isolation&& \
         pip install . --no-build-isolation --no-cache
     "
 
