@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 
 from dpvo.dinov3_backbone.DinoHead import getDinoHead
 from torchvision import transforms
+import torch.nn.functional as F
 
 DIM = 384
 
@@ -200,7 +201,7 @@ class VONet(nn.Module):
         # images = 2 * (images / 255.0) - 0.5
         images = self.transform(images / 255.0)
         intrinsics = intrinsics / 16.0
-        disps = disps[:, :, 1::4, 1::4].float()
+        disps = F.interpolate(disps, scale_factor=1/16, mode='bilinear', align_corners=False).float()
 
         fmap, gmap, imap, patches, ix = self.patchify(images, disps=disps)
 
