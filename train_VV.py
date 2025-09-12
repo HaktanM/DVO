@@ -81,11 +81,7 @@ def train(args):
 
 
             poses = SE3(poses).inv()
-            if not args.test:
-                traj, stats, logging, _ = net(images, poses, disps, intrinsics, M=1024, STEPS=STEPS, structure_only=so, wtd_loss=args.all_flows_loss, total_steps=total_steps)
-            else:
-                with torch.no_grad():
-                    traj, stats, logging, _ = net(images, poses, disps, intrinsics, M=1024, STEPS=STEPS, structure_only=so, wtd_loss=args.all_flows_loss, total_steps=total_steps)
+            traj, stats, logging, _ = net(images, poses, disps, intrinsics, M=1024, STEPS=STEPS, structure_only=so, wtd_loss=args.all_flows_loss, total_steps=total_steps)
 
             tr_list = []
             ro_list = []
