@@ -77,10 +77,8 @@ def train(args):
             optimizer.zero_grad()
 
             # fix poses to gt for first 1k steps
-            if not args.so_flag:
-                so = False
-            else:
-                so = total_steps < 1000 and args.ckpt is None
+            so = False
+
 
             poses = SE3(poses).inv()
             if not args.test:

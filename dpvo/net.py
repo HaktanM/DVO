@@ -199,7 +199,7 @@ class VONet(nn.Module):
 
         # images = 2 * (images / 255.0) - 0.5
         images = self.transform(images / 255.0)
-        intrinsics = intrinsics / 4.0
+        intrinsics = intrinsics / 16.0
         disps = disps[:, :, 1::4, 1::4].float()
 
         fmap, gmap, imap, patches, ix = self.patchify(images, disps=disps)
