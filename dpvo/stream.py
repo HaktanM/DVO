@@ -5,6 +5,7 @@ from multiprocessing import Process, Queue
 from pathlib import Path
 from itertools import chain
 
+
 def image_stream(queue, imagedir, calib, stride, skip=0):
     """ image generator """
 
@@ -28,8 +29,8 @@ def image_stream(queue, imagedir, calib, stride, skip=0):
 
         # Crop the image so that its width and height can be divided by 16
         h, w, _ = image.shape
-        crop_h = h % 16
-        crop_w = w % 16
+        crop_h = h % 32
+        crop_w = w % 32
 
         top = crop_h // 2
         left = crop_w // 2
