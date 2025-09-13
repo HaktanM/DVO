@@ -4,7 +4,7 @@
 #SBATCH --output=/arf/scratch/hyalcin/slurm_outs/%A.out
 #SBATCH --error=/arf/scratch/hyalcin/slurm_outs/%A.err
 #SBATCH --time=3-00:00:00
-#SBATCH --job-name=DinoV2
+#SBATCH --job-name=valiD2
 
 #SBATCH --partition=kolyoz-cuda
 #SBATCH --nodes=1

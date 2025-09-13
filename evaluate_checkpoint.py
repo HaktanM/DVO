@@ -119,8 +119,8 @@ if __name__=="__main__":
     parser.add_argument('--R', type=int, default=3)
 
     ## Dino related arguments
-    parser.add_argument('--DINO_MODEL', type=str, default="dinov3_vitb16")
-    parser.add_argument('--PATH_DINO_WEIGHTS', type=str, default=f"dinov3/weights/dinov3_vitb16.pth")
+    parser.add_argument('--DINO_MODEL', type=str, default="dinov3_vits16plus")
+    parser.add_argument('--PATH_DINO_WEIGHTS', type=str, default=f"dinov3/weights/dinov3_vits16plus.pth")
 
     ## Which Configuration you want to validate
     parser.add_argument('--model', type=str, default=f"DinoV2")
@@ -148,6 +148,6 @@ if __name__=="__main__":
 
     
     for iteration in iteration_list:
-        checkpoint_dpvo = os.path.join("/DVO/checkpoint",args.model + "_" + iteration + ".pth")
+        checkpoint_dpvo = os.path.join("/DVO/checkpoints",args.model + "_" + iteration + ".pth")
         net = load_weights(checkpoint_dpvo)
         validateEuRoC(args, cfg, net)
