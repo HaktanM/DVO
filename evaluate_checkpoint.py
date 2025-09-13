@@ -48,7 +48,7 @@ def load_weights(network):
     return network
 
 
-def validateEuRoC(args, cfg, net):
+def validateEuRoC(args, cfg, net, checkpoint_dpvo):
 
     euroc_scenes = [
         "MH_01_easy",
@@ -94,7 +94,7 @@ def validateEuRoC(args, cfg, net):
 
             # Finally print and save the result
             ate_score = result.stats["rmse"]
-            network_config = args.cp.split("/")[-1].split(".")[0]
+            network_config = checkpoint_dpvo.split("/")[-1].split(".")[0]
             print(f"{network_config} in {scene} : {ate_score}")
             write_trajectory(path=os.path.join("EstimatedTrajectories",network_config), seq=scene, traj=traj_est_raw, times=tstamps, trial_id=trial_id)
 
@@ -146,6 +146,9 @@ if __name__=="__main__":
 
     
     for iteration in iteration_list:
+        
         checkpoint_dpvo = os.path.join("/DVO/checkpoints",args.model + "_" + iteration + ".pth")
+        print(f"Evaluation of {checkpoint_dpvo.split("/")[-1].split(".")[0]}")
+        
         net = load_weights(checkpoint_dpvo)
-        validateEuRoC(args, cfg, net)
+        validateEuRoC(args, cfg, net, checkpoint_dpvo)
