@@ -3,7 +3,6 @@ import os
 from multiprocessing import Process, Queue
 from pathlib import Path
 
-import cv2
 import evo.main_ape as main_ape
 import numpy as np
 import torch
@@ -31,11 +30,6 @@ def write_trajectory(path, seq, traj, times, trial_id):
 
 SKIP = 0
 
-def show_image(image, t=0):
-    image = image.permute(1, 2, 0).cpu().numpy()
-    cv2.imshow('image', image / 255.0)
-    cv2.waitKey(t)
-
 @torch.no_grad()
 def run(cfg, network, imagedir, calib, stride=1, viz=False, show_img=False):
 
@@ -49,14 +43,8 @@ def run(cfg, network, imagedir, calib, stride=1, viz=False, show_img=False):
         (t, image, intrinsics) = queue.get()
         if t < 0: break
 
-        cv2.imshow("image", image)
-        cv2.waitKey(1)
-
         image = torch.from_numpy(image).permute(2,0,1).cuda()
         intrinsics = torch.from_numpy(intrinsics).cuda()
-
-        if show_img:
-            show_image(image, 1)
 
         if slam is None:
             slam = DPVO(cfg, network, ht=image.shape[1], wd=image.shape[2], viz=viz)

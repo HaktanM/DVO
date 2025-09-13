@@ -1,10 +1,8 @@
-import cv2
 import os
 import argparse
 import numpy as np
 from collections import OrderedDict
 
-import matplotlib.pyplot as plt
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
