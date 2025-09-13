@@ -28,7 +28,7 @@ from torchvision import transforms
 DIM = 384
 
 class Update(nn.Module):
-    def __init__(self, p):
+    def __init__(self, cfg):
         super(Update, self).__init__()
 
         self.c1 = nn.Sequential(
@@ -54,7 +54,7 @@ class Update(nn.Module):
         )
 
         self.corr = nn.Sequential(
-            nn.Linear(2*49*p*p, DIM),
+            nn.Linear(2*(2*cfg.R+1)*(2*cfg.R+1)*cfg.P*cfg.P, DIM),
             nn.ReLU(inplace=True),
             nn.Linear(DIM, DIM),
             nn.LayerNorm(DIM, eps=1e-3),
@@ -96,20 +96,14 @@ class Update(nn.Module):
 
 
 class Patchifier(nn.Module):
-    def __init__(self, patch_size=3):
+    def __init__(self, cfg):
         super(Patchifier, self).__init__()
-        self.patch_size = patch_size
-        # self.fnet = BasicEncoder4(output_dim=128, norm_fn='instance')
-        # self.inet = BasicEncoder4(output_dim=DIM, norm_fn='none')
-        # self.dino_dpt = make_dinov3_head(backbone_name="dinov3_vitb16",
-        #                                  channels=DIM+128,
-        #                                 pretrained=True,
-        #                                 backbone_weights="dinov3/weights/dinov3_vitb16.pth")
-        self.dino_dpt = make_dinov3_head(backbone_name="dinov3_vitb16",
-                                         f_dim=128+DIM,
-                                         i_dim=None,
-                                        pretrained=True,
-                                        backbone_weights="dinov3/weights/dinov3_vitb16.pth")
+        self.patch_size = cfg.P
+        self.dino_head  = make_dinov3_head( backbone_name=cfg.DINO_MODEL,
+                                            f_dim=128,
+                                            i_dim=DIM,
+                                            pretrained=True,
+                                            backbone_weights=cfg.PATH_DINO_WEIGHTS)
 
     def __image_gradient(self, images):
         gray = ((images + 0.5) * (255.0 / 2)).sum(dim=2)
@@ -124,9 +118,7 @@ class Patchifier(nn.Module):
         # fmap = self.fnet(images) / 4.0
         # imap = self.inet(images) / 4.0
 
-        embed = self.dino_dpt(images)
-        imap = embed[:,:,:DIM] / 4.0
-        fmap = embed[:,:,DIM:] / 4.0
+        fmap, imap = self.dino_head(images)
         
         b, n, c, h, w = fmap.shape
         P = self.patch_size
@@ -190,11 +182,11 @@ class CorrBlock:
 
 
 class VONet(nn.Module):
-    def __init__(self, use_viewer=False):
+    def __init__(self, cfg, use_viewer=False):
         super(VONet, self).__init__()
-        self.P = 3
-        self.patchify = Patchifier(self.P)
-        self.update = Update(self.P)
+        self.P = cfg.P
+        self.patchify = Patchifier(cfg)
+        self.update = Update(cfg)
 
         self.DIM = DIM
         self.RES = 4

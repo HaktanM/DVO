@@ -50,7 +50,7 @@ def train(args):
     db = dataset_factory(['tartan'], datapath="datasets/TartanAir", n_frames=args.n_frames)
     train_loader = DataLoader(db, batch_size=1, shuffle=True, num_workers=4)
 
-    net = VONet()
+    net = VONet(cfg = args)
     net.train()
     net.cuda()
 
@@ -166,6 +166,11 @@ if __name__ == '__main__':
     parser.add_argument('--n_frames', type=int, default=15)
     parser.add_argument('--pose_weight', type=float, default=10.0)
     parser.add_argument('--flow_weight', type=float, default=0.1)
+
+    ## Dino related arguments
+    parser.add_argument('--DINO_MODEL', type=str, default="dinov3_vits16plus")
+    parser.add_argument('--PATH_DINO_WEIGHTS', type=str, default=f"dinov3/weights/dinov3_vits16plus.pth")
+    
     args = parser.parse_args()
 
     train(args)
