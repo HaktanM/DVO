@@ -106,10 +106,12 @@ if __name__=="__main__":
     
 
     model_list = [
-        "DVOl16",
-        "DVOb16",
-        "DVOs16plus",
-        "DVOb16_lr_4e-5"
+        "DinoV2",
+        "DVO-Baseline",
+        "DVO-all-layers",
+        "DVO-fw20.0",
+        "DVO-fw4.0",
+        "DVO-SingleCorrelation"
     ]
 
     # model_list = [
@@ -117,29 +119,30 @@ if __name__=="__main__":
     # ]
 
     dino_weight_dict = {
-        model_list[0] : "dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd",
-        model_list[1] : "dinov3_vitb16",
-        model_list[2] : "dinov3_vits16plus_pretrain_lvd1689m-4057cbaa",
-        model_list[3] : "dinov3_vitb16",
+        model_list[0] : "dinov3_vitb16",
+        model_list[1] : "dinov3_vits16plus",
+        model_list[2] : "dinov3_vits16plus",
+        model_list[3] : "dinov3_vits16plus",
+        model_list[4] : "dinov3_vits16plus",
+        model_list[5] : "dinov3_vits16plus",
     }
 
     dino_model_dict = {
         model_list[0] : "dinov3_vitl16",
-        model_list[1] : "dinov3_vitb16",
+        model_list[1] : "dinov3_vits16plus",
         model_list[2] : "dinov3_vits16plus",
-        model_list[3] : "dinov3_vitb16",
+        model_list[3] : "dinov3_vits16plus",
+        model_list[4] : "dinov3_vits16plus",
+        model_list[5] : "dinov3_vits16plus",
     }
 
 
     iteration_list = [
-        "050000",
-        "070000",
-        "080000",
-        "090000",
+        "240000",
     ]
 
     for iteration in iteration_list:
-        for model in model_list:
+        for model in [model_list[1]]:
             checkpoint_dpvo = model + "_" + iteration + ".pth"
             parser = argparse.ArgumentParser()
             parser.add_argument('--cp', default=f"/home/haktanito/icra2026/checkpoints/{checkpoint_dpvo}")
@@ -153,7 +156,7 @@ if __name__=="__main__":
 
             parser.add_argument('--config', default="config/default.yaml")
             parser.add_argument('--stride', type=int, default=2)
-            parser.add_argument('--trials', type=int, default=1)
+            parser.add_argument('--trials', type=int, default=10)
             parser.add_argument('--eurocdir', default="/media/haktanito/HDD/EuroC")
             parser.add_argument('--backend_thresh', type=float, default=64.0)
             parser.add_argument('--plot', action="store_true")
