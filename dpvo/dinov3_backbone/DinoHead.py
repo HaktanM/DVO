@@ -73,14 +73,15 @@ class DVOHead(torch.nn.Module):
     def __init__(
         self,
         encoder: torch.nn.Module,
-        encoder_dtype=torch.float
+        encoder_dtype=torch.float,
+        number_of_layers = None
     ):
         super().__init__()
         self.encoder = encoder
         self.encoder_dtype = encoder_dtype
 
-        self.fnet = torch.nn.Conv2d(in_channels=3*384, out_channels=128, kernel_size=1)
-        self.inet = torch.nn.Conv2d(in_channels=3*384, out_channels=384, kernel_size=1)
+        self.fnet = torch.nn.Conv2d(in_channels=number_of_layers*384, out_channels=128, kernel_size=1)
+        self.inet = torch.nn.Conv2d(in_channels=number_of_layers*384, out_channels=384, kernel_size=1)
 
         self.is_cuda = torch.cuda.is_available()
 
@@ -138,7 +139,7 @@ def getDinoHead(
 
     # Finally, return our DVO head
     # DVO head convers Dino vectors into fmap and gmap
-    return DVOHead(encoder=encoder)
+    return DVOHead(encoder=encoder, number_of_layers=len(cfg.ENCODER_LAYERS))
 
 
     
