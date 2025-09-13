@@ -109,22 +109,28 @@ class EncoderDecoderFusion(torch.nn.Module):
         prefix_shape = x.shape[:-3]
         x = x.reshape(-1, *x.shape[-3:])
         x = x.to(self.encoder_dtype)
-        # f_cnn = self.fnet_cnn(x)
-        # i_cnn = self.inet_cnn(x)
+        f_cnn = self.fnet_cnn(x)
+        i_cnn = self.inet_cnn(x)
         with torch.no_grad():
             x = self.encoder(x)
         x = cast_to(x, self.decoder_dtype)
-        # f_cnn = cast_to(f_cnn, self.decoder_dtype)
-        # i_cnn = cast_to(i_cnn, self.decoder_dtype)
+        
+        # Get CNN features
+        f_cnn = cast_to(f_cnn, self.decoder_dtype)
+        i_cnn = cast_to(i_cnn, self.decoder_dtype)
+        
+        # Get DPT Features
         f_dpt = self.fdecoder(x)
-        # i_dpt = self.idecoder(x)
-        f_x = self.f_fusion(f_dpt, f_dpt)
-        # i_x = self.i_fusion(i_dpt, i_cnn)
+        i_dpt = self.idecoder(x)
+
+        # Fuse
+        f_x = self.f_fusion(f_dpt, f_cnn)
+        i_x = self.i_fusion(i_dpt, i_cnn)
         
         f_x = f_x.reshape(*prefix_shape, *f_x.shape[-3:])
-        # i_x = i_x.reshape(*prefix_shape, *i_x.shape[-3:])
+        i_x = i_x.reshape(*prefix_shape, *i_x.shape[-3:])
 
-        return f_x# , i_x
+        return f_x, i_x
 
 
 def build_head(
@@ -159,32 +165,32 @@ def build_head(
         **kwargs,
     )
     
-    # idecoder = make_head(
-    #     encoder.embed_dims,
-    #     use_batchnorm=use_batchnorm,
-    #     use_cls_token=use_cls_token,
-    #     channels=i_dim,
-    #     convmodule_norm_cfg=None,
-    #     **kwargs,
-    # )
+    idecoder = make_head(
+        encoder.embed_dims,
+        use_batchnorm=use_batchnorm,
+        use_cls_token=use_cls_token,
+        channels=i_dim,
+        convmodule_norm_cfg=None,
+        **kwargs,
+    )
     
-    # fnet_cnn = BasicEncoder4(output_dim=f_dim, norm_fn='instance')
-    # inet_cnn = BasicEncoder4(output_dim=i_dim, norm_fn='none')
-    # fnet_cnn = fnet_cnn.to(encoder_dtype)
-    # inet_cnn = inet_cnn.to(encoder_dtype)
-    # encoder.eval()
-    
-    f_fusion = Fusion(f_dim,f_dim,f_dim,norm_fn="instance")
-    # i_fusion = Fusion(i_dim,i_dim,i_dim,norm_fn="none")
+    fnet_cnn = BasicEncoder4(output_dim=f_dim, norm_fn='instance')
+    inet_cnn = BasicEncoder4(output_dim=i_dim, norm_fn='none')
+
+    fnet_cnn = fnet_cnn.to(encoder_dtype)
+    inet_cnn = inet_cnn.to(encoder_dtype)
+
+    f_fusion = Fusion(f_dim, f_dim, f_dim,norm_fn="instance")
+    i_fusion = Fusion(i_dim, i_dim, i_dim,norm_fn="none")
 
     encoder_decoder = EncoderDecoderFusion(
-            encoder=encoder,
-            fdecoder=fdecoder,
-            idecoder=None,
-            fnet_cnn=None,
-            inet_cnn=None,
-            f_fusion=f_fusion,
-            i_fusion=None,
+            encoder = encoder,
+            fdecoder= fdecoder,
+            idecoder= idecoder,
+            fnet_cnn= fnet_cnn,
+            inet_cnn= inet_cnn,
+            f_fusion= f_fusion,
+            i_fusion= i_fusion,
             encoder_dtype=encoder_dtype,
             decoder_dtype=decoder_dtype,
         )
