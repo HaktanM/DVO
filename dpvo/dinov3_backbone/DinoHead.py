@@ -60,12 +60,12 @@ dino_weight_dict = {
 
 
 class Config:
-    DINE_MODEL          = None
+    DINO_MODEL          = None
     PATH_DINO_WEIGHTS   = None
 
     @property
     def PATH_DINO_WEIGHTS(self):
-        return f'dinov3/weights/{dino_weight_dict[self.DINE_MODEL]}.pth'
+        return f'dinov3/weights/{dino_weight_dict[self.DINO_MODEL]}.pth'
 
 
 
@@ -123,7 +123,7 @@ def getDinoHead(
     ):
 
     # Get the DinoV3 model 
-    backbone: torch.nn.Module = _BACKBONE_DICT[cfg.DINE_MODEL](
+    backbone: torch.nn.Module = _BACKBONE_DICT[cfg.DINO_MODEL](
         pretrained=True,
         weights=cfg.PATH_DINO_WEIGHTS,
     )

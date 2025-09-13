@@ -98,7 +98,7 @@ def validateEuRoC(args, cfg, net):
             ate_score = result.stats["rmse"]
             network_config = args.cp.split("/")[-1].split(".")[0]
             print(f"{network_config} in {scene} : {ate_score}")
-            write_trajectory(path=os.path.join("EstimatedTrajectories2",network_config), seq=scene, traj=traj_est_raw, times=tstamps, trial_id=trial_id)
+            write_trajectory(path=os.path.join("EstimatedTrajectories",network_config), seq=scene, traj=traj_est_raw, times=tstamps, trial_id=trial_id)
 
 
 if __name__=="__main__":
@@ -106,10 +106,10 @@ if __name__=="__main__":
     
 
     model_list = [
-        "DVOl16",
-        "DVOb16",
-        "DVOs16plus",
-        "DVOb16_lr_4e-5"
+        "DVO-Baseline",
+        "DVO-fw20.0",
+        "DVO-fw4.0",
+        "DVO-SingleCorrelation",
     ]
 
     # model_list = [
@@ -117,36 +117,38 @@ if __name__=="__main__":
     # ]
 
     dino_weight_dict = {
-        model_list[0] : "dinov3_vitl16_pretrain_lvd1689m-8aa4cbdd",
-        model_list[1] : "dinov3_vitb16",
-        model_list[2] : "dinov3_vits16plus_pretrain_lvd1689m-4057cbaa",
-        model_list[3] : "dinov3_vitb16",
+        model_list[0] : "dinov3_vits16plus",
+        model_list[1] : "dinov3_vits16plus",
+        model_list[2] : "dinov3_vits16plus",
+        model_list[3] : "dinov3_vits16plus",
     }
 
     dino_model_dict = {
-        model_list[0] : "dinov3_vitl16",
-        model_list[1] : "dinov3_vitb16",
+        model_list[0] : "dinov3_vits16plus",
+        model_list[1] : "dinov3_vits16plus",
         model_list[2] : "dinov3_vits16plus",
-        model_list[3] : "dinov3_vitb16",
+        model_list[3] : "dinov3_vits16plus",
     }
 
 
     iteration_list = [
+        "030000",
+        "040000",
         "050000",
-        "070000",
-        "080000",
-        "090000",
+        "060000",
     ]
 
     for iteration in iteration_list:
-        for model in [model_list[1]]:
+        for model in model_list:
             checkpoint_dpvo = model + "_" + iteration + ".pth"
             parser = argparse.ArgumentParser()
             parser.add_argument('--cp', default=f"/home/haktanito/icra2026/checkpoints/{checkpoint_dpvo}")
             parser.add_argument('--P', default=3)
             parser.add_argument('--R', default=3)
-            parser.add_argument('--DINO_MODEL', default=dino_model_dict[model])
-            parser.add_argument('--PATH_DINO_WEIGHTS', default=f'dinov3/weights/{dino_weight_dict[model]}.pth')
+            ## Dino related arguments
+            parser.add_argument('--DINO_MODEL', type=str, default="dinov3_vits16plus")
+            parser.add_argument('--PATH_DINO_WEIGHTS', type=str, default=f"dinov3/weights/dinov3_vits16plus.pth")
+            parser.add_argument('--ENCODER_LAYERS', type=list, default=[0, 3, 5])
 
             parser.add_argument('--dataset', default='EuRoC')
 

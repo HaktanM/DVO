@@ -174,7 +174,7 @@ if __name__ == '__main__':
     parser.add_argument('--R', type=int, default=3)
 
     ## Dino related arguments
-    parser.add_argument('--DINE_MODEL', type=str, default="dinov3_vits16plus")
+    parser.add_argument('--DINO_MODEL', type=str, default="dinov3_vits16plus")
     parser.add_argument('--PATH_DINO_WEIGHTS', type=str, default=f"dinov3/weights/dinov3_vits16plus.pth")
     parser.add_argument('--ENCODER_LAYERS', type=list, default=[0, 3, 5])
     args = parser.parse_args()

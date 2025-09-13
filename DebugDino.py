@@ -21,19 +21,19 @@ dino_weight_dict = {
 
 
 class Config:
-    DINE_MODEL          = None
+    DINO_MODEL          = None
     ENCODER_LAYERS      = [0, 3, 5]
 
     @property
     def PATH_DINO_WEIGHTS(self):
-        return f'dinov3/weights/{dino_weight_dict[self.DINE_MODEL]}.pth'
+        return f'dinov3/weights/{dino_weight_dict[self.DINO_MODEL]}.pth'
 
 
 if __name__ == "__main__":
     model = model_list[2]
 
     cfg = Config()
-    cfg.DINE_MODEL = model
+    cfg.DINO_MODEL = model
 
 
 
