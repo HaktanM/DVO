@@ -82,7 +82,7 @@ def validateEuRoC(args, cfg, net):
 
 
             # Get the groundtruth
-            groundtruth = "/home/haktanito/workspace/DPVO/datasets/euroc_groundtruth/{}.txt".format(scene) 
+            groundtruth = "/DVO/datasets/euroc_groundtruth/{}.txt".format(scene) 
             traj_ref = file_interface.read_tum_trajectory_file(groundtruth)
             
             # Sync estimated trajectory with groundtruth
