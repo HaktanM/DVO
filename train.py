@@ -158,7 +158,7 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--name', default='dino', help='name your experiment')
+    parser.add_argument('--name', default='DinoV2', help='name your experiment')
     parser.add_argument('--ckpt', help='checkpoint to restore')
     parser.add_argument('--steps', type=int, default=240000)
     parser.add_argument('--lr', type=float, default=0.00008)
@@ -169,7 +169,11 @@ if __name__ == '__main__':
 
     # Path to h5 files
     parser.add_argument('--h5_path', default="/data", help='path to h5 files')
-    
+
+    ## Patch size and correlation radius
+    parser.add_argument('--P', type=int, default=3)
+    parser.add_argument('--R', type=int, default=3)
+
     ## Dino related arguments
     parser.add_argument('--DINO_MODEL', type=str, default="dinov3_vits16plus")
     parser.add_argument('--PATH_DINO_WEIGHTS', type=str, default=f"dinov3/weights/dinov3_vits16plus.pth")
