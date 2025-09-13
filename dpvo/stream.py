@@ -26,15 +26,19 @@ def image_stream(queue, imagedir, calib, stride, skip=0):
         if len(calib) > 4:
             image = cv2.undistort(image, K, calib[4:])
 
-        if 0:
-            image = cv2.resize(image, None, fx=0.5, fy=0.5)
-            intrinsics = np.array([fx / 2, fy / 2, cx / 2, cy / 2])
-
-        else:
-            intrinsics = np.array([fx, fy, cx, cy])
-            
+        # Crop the image so that its width and height can be divided by 16
         h, w, _ = image.shape
-        image = image[:h-h%16, :w-w%16]
+        crop_h = h % 16
+        crop_w = w % 16
+
+        top = crop_h // 2
+        left = crop_w // 2
+        bottom = h - (crop_h - top)
+        right = w - (crop_w - left)
+        image = image[top:bottom, left:right]
+
+        # Modify the intrinsics as well
+        intrinsics = np.array([fx, fy, cx - left, cy - top])
 
         queue.put((t, image, intrinsics))
 
