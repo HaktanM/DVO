@@ -47,7 +47,7 @@ def train(args):
     # legacy ddp code
     rank = 0
 
-    db = dataset_factory(['tartan'], datapath="datasets/TartanAir", n_frames=args.n_frames)
+    db = dataset_factory(['tartan'], datapath=args.h5_path, n_frames=args.n_frames)
     train_loader = DataLoader(db, batch_size=1, shuffle=True, num_workers=4)
 
     net = VONet(cfg = args)
@@ -167,10 +167,13 @@ if __name__ == '__main__':
     parser.add_argument('--pose_weight', type=float, default=10.0)
     parser.add_argument('--flow_weight', type=float, default=0.1)
 
+    # Path to h5 files
+    parser.add_argument('--h5_path', default="/data", help='path to h5 files')
+    
     ## Dino related arguments
     parser.add_argument('--DINO_MODEL', type=str, default="dinov3_vits16plus")
     parser.add_argument('--PATH_DINO_WEIGHTS', type=str, default=f"dinov3/weights/dinov3_vits16plus.pth")
-    
+
     args = parser.parse_args()
 
     train(args)
